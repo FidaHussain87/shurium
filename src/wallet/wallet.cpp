@@ -388,6 +388,14 @@ std::unique_ptr<Wallet> Wallet::Generate(const std::string& password,
     return FromMnemonic(mnemonic, "", password, config);
 }
 
+std::unique_ptr<Wallet> Wallet::GenerateWithMnemonic(std::string& mnemonicOut,
+                                                      const std::string& password,
+                                                      Mnemonic::Strength strength,
+                                                      const Config& config) {
+    mnemonicOut = Mnemonic::Generate(strength);
+    return FromMnemonic(mnemonicOut, "", password, config);
+}
+
 std::unique_ptr<Wallet> Wallet::Load(const std::string& path) {
     // Load with default config
     return Load(path, Config{});

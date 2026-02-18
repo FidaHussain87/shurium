@@ -386,16 +386,57 @@ If you see JSON output, everything is working.
 
 | Term | What It Is |
 |------|------------|
-| **Wallet** | Container holding all your keys/addresses. Created **automatically** when daemon starts. |
+| **Wallet** | Container holding all your keys/addresses. Stores your 24-word recovery phrase. |
 | **Address** | A destination for receiving coins. You can have many addresses in one wallet. |
+| **Recovery Phrase** | 24 words that can restore your entire wallet. **NEVER share these!** |
 
-**The wallet is created automatically** - you don't need to run any command. When the daemon starts for the first time, it creates:
-- `~/.shurium/regtest/wallet.dat` - Your encrypted private keys
-- `~/.shurium/regtest/wallet_data.dat` - Transaction history
+### Two Ways to Create a Wallet
+
+**Option A: Automatic (Default)**
+When the daemon starts for the first time, it automatically creates a wallet. However, this does **NOT** show you the recovery phrase.
+
+**Option B: Manual with Recovery Phrase (Recommended)**
+Create a wallet explicitly to see your 24-word recovery phrase:
+
+```bash
+# Stop daemon if running
+./shurium-cli --regtest stop 2>/dev/null
+
+# Start daemon
+./shuriumd --regtest --daemon
+sleep 3
+
+# Create wallet and GET YOUR RECOVERY PHRASE
+./shurium-cli --regtest createwallet "mywallet" "optional_password"
+```
+
+**Output:**
+```json
+{
+  "name": "mywallet",
+  "mnemonic": "word1 word2 word3 ... word24",
+  "warning": "IMPORTANT: Write down these 24 words..."
+}
+```
+
+⚠️ **CRITICAL - WRITE THESE DOWN:**
+1. **Copy the 24 words** from the `mnemonic` field
+2. **Write them on paper** (not digital!)
+3. **Store securely** (safe, safety deposit box, etc.)
+4. **Never share** with anyone
+5. These words can **restore your wallet** if you lose access
+
+### Wallet Files Location
+
+| Network | Wallet Files |
+|---------|--------------|
+| Regtest | `~/.shurium/regtest/wallet.dat` |
+| Testnet | `~/.shurium/testnet/wallet.dat` |
+| Mainnet | `~/.shurium/wallet.dat` |
 
 ### Generate a New Address
 
-Addresses are generated from your wallet. Each address can receive coins independently.
+Once you have a wallet, generate addresses to receive coins:
 
 ```bash
 # Make sure you're in the build directory
@@ -441,9 +482,38 @@ ADDR=$(./shurium-cli --regtest getnewaddress)
 
 ---
 
-## Step 8: Secure Your Wallet (Optional)
+## Step 8: Secure Your Wallet
 
-### Encrypt Your Wallet
+### Understanding Wallet Security
+
+| Security Layer | What It Protects Against | How to Set Up |
+|----------------|-------------------------|---------------|
+| **Recovery Phrase** | Complete loss (hardware failure, theft) | Write down 24 words from `createwallet` |
+| **Encryption** | Unauthorized access to wallet file | Use `encryptwallet` command |
+| **Backup** | File corruption, accidental deletion | Use `backupwallet` command |
+
+### 1. Save Your Recovery Phrase (MOST IMPORTANT)
+
+If you used `createwallet`, you received 24 words. These are your **recovery phrase**.
+
+```
+word1 word2 word3 word4 word5 word6
+word7 word8 word9 word10 word11 word12
+word13 word14 word15 word16 word17 word18
+word19 word20 word21 word22 word23 word24
+```
+
+**How to store safely:**
+- ✅ Write on paper, store in safe
+- ✅ Engrave on metal plate (fire/water resistant)
+- ✅ Split into parts, store in different locations
+- ❌ Never store digitally (computer, phone, cloud)
+- ❌ Never email or message to anyone
+- ❌ Never take a photo
+
+### 2. Encrypt Your Wallet
+
+Add password protection to your wallet file:
 
 ```bash
 ./shurium-cli --regtest encryptwallet "your_strong_password_here"
@@ -451,11 +521,37 @@ ADDR=$(./shurium-cli --regtest getnewaddress)
 
 ⚠️ **Warning:** SHURIUM will restart after this. That's normal!
 
-### Create a Backup
+After encryption, you'll need to unlock before sending:
+```bash
+# Unlock for 300 seconds (5 minutes)
+./shurium-cli --regtest walletpassphrase "your_password" 300
+
+# Send transaction...
+
+# Lock again
+./shurium-cli --regtest walletlock
+```
+
+### 3. Backup Your Wallet File
+
+Create a backup copy of your wallet:
 
 ```bash
 ./shurium-cli --regtest backupwallet ~/shurium-wallet-backup.dat
 ```
+
+Store this backup file securely (USB drive in safe, etc.).
+
+### Check Your Wallet Status
+
+```bash
+./shurium-cli --regtest getwalletinfo
+```
+
+Shows:
+- `balance` - Your available balance
+- `unlocked_until` - When wallet will auto-lock (0 = locked)
+- `keypoolsize` - Number of pre-generated addresses
 
 ---
 

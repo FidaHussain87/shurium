@@ -439,6 +439,17 @@ public:
                                              Mnemonic::Strength strength = Mnemonic::Strength::Words24,
                                              const Config& config = {});
     
+    /// Generate new wallet and return mnemonic
+    /// @param[out] mnemonic The generated 24-word recovery phrase
+    /// @param password Password to encrypt the wallet (can be empty)
+    /// @param strength Mnemonic strength (12, 18, or 24 words)
+    /// @param config Wallet configuration
+    /// @return The new wallet, or nullptr on failure
+    static std::unique_ptr<Wallet> GenerateWithMnemonic(std::string& mnemonic,
+                                                         const std::string& password,
+                                                         Mnemonic::Strength strength = Mnemonic::Strength::Words24,
+                                                         const Config& config = {});
+    
     /// Load from file
     static std::unique_ptr<Wallet> Load(const std::string& path);
     

@@ -3495,8 +3495,10 @@ RPCResponse cmd_createwallet(const RPCRequest& req, const RPCContext& ctx,
         wallet::Wallet::Config config;
         config.name = walletName;
         
-        // Generate new wallet
-        auto wallet = wallet::Wallet::Generate(passphrase, wallet::Mnemonic::Strength::Words24, config);
+        // Generate new wallet and get mnemonic
+        std::string mnemonic;
+        auto wallet = wallet::Wallet::GenerateWithMnemonic(mnemonic, passphrase, 
+                                                           wallet::Mnemonic::Strength::Words24, config);
         if (!wallet) {
             return RPCResponse::Error(-4, "Failed to create wallet", req.GetId());
         }
@@ -3510,12 +3512,17 @@ RPCResponse cmd_createwallet(const RPCRequest& req, const RPCContext& ctx,
         // Set wallet in command table
         table->SetWallet(std::move(wallet));
         
-        JSONValue result;
+        JSONValue::Object result;
         result["name"] = walletName;
-        result["warning"] = passphrase.empty() ? 
-            "Wallet created without encryption. Use encryptwallet to secure it." : "";
+        result["mnemonic"] = mnemonic;
+        result["warning"] = "IMPORTANT: Write down these 24 words and store them securely! "
+                           "This is the ONLY way to recover your wallet. "
+                           "Anyone with these words can access your funds.";
+        if (passphrase.empty()) {
+            result["encryption_warning"] = "Wallet created without encryption. Use encryptwallet to secure it.";
+        }
         
-        return RPCResponse::Success(result, req.GetId());
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
     } catch (const std::exception& e) {
         return RPCResponse::Error(-4, std::string("Error creating wallet: ") + e.what(), req.GetId());
     }

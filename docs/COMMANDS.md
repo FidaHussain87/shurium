@@ -831,7 +831,7 @@ Loads a wallet from a wallet file.
 
 ### createwallet
 
-Creates a new wallet.
+Creates a new wallet and displays the 24-word recovery phrase.
 
 ```bash
 ./shurium-cli createwallet "WALLET_NAME" [passphrase]
@@ -844,16 +844,23 @@ Creates a new wallet.
 
 **Example:**
 ```bash
-./shurium-cli createwallet "savings" "mypassword"
+./shurium-cli --regtest createwallet "mywallet" "mypassword"
 ```
 
 **Returns:**
 ```json
 {
-  "name": "savings",
-  "warning": ""
+  "name": "mywallet",
+  "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+  "warning": "IMPORTANT: Write down these 24 words and store them securely! This is the ONLY way to recover your wallet. Anyone with these words can access your funds."
 }
 ```
+
+⚠️ **CRITICAL:** 
+- **Write down the 24 words immediately!** This is your recovery phrase.
+- **Store it securely offline** (paper, metal backup, NOT on computer).
+- **Never share these words** with anyone - they give full access to your funds.
+- This is the **only time** the mnemonic is shown. It cannot be retrieved later.
 
 ---
 
