@@ -930,6 +930,49 @@ Submits a mined block.
 
 ---
 
+### generatetoaddress
+
+Mine blocks immediately to a specified address. **Only works in regtest mode.**
+
+```bash
+./shurium-cli --regtest generatetoaddress NBLOCKS ADDRESS
+```
+
+**Parameters:**
+| Parameter | Description |
+|-----------|-------------|
+| NBLOCKS | Number of blocks to generate (1-10000) |
+| ADDRESS | Address to send coinbase rewards to |
+
+**Examples:**
+```bash
+# Mine 1 block
+./shurium-cli --regtest generatetoaddress 1 shr1qexampleaddress...
+
+# Mine 101 blocks (get spendable coins)
+ADDR=$(./shurium-cli --regtest getnewaddress)
+./shurium-cli --regtest generatetoaddress 101 $ADDR
+
+# Check balance after mining
+./shurium-cli --regtest getbalance
+```
+
+**Returns:** Array of block hashes
+```json
+[
+  "1a2b3c4d5e6f...",
+  "2b3c4d5e6f7a...",
+  ...
+]
+```
+
+**Notes:**
+- Coinbase rewards need 100 confirmations before they're spendable
+- Each block rewards 40 SHR to the miner (40% of 100 SHR block reward)
+- This command is only available in regtest mode for testing
+
+---
+
 ### getwork
 
 Gets PoUW (Proof of Useful Work) problem.
