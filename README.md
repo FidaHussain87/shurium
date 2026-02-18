@@ -128,7 +128,7 @@ cd /path/to/shurium/build
 
 **For Local Development (Regtest) - Recommended for beginners:**
 ```bash
-# Start daemon
+# Start daemon (wallet is created automatically on first run)
 ./shuriumd --regtest --daemon
 
 # Wait 3 seconds for startup
@@ -137,7 +137,7 @@ sleep 3
 # Verify it's running
 ./shurium-cli --regtest getblockchaininfo
 
-# Generate mining address
+# Generate a new address in your wallet
 ./shurium-cli --regtest getnewaddress
 
 # Mine 101 blocks (to get spendable coins)
@@ -149,6 +149,8 @@ sleep 3
 # Stop daemon when done
 ./shurium-cli --regtest stop
 ```
+
+> **Note:** The wallet (`~/.shurium/regtest/wallet.dat`) is created automatically when the daemon starts for the first time. You don't need to create it manually.
 
 **For Practice (Testnet):**
 ```bash

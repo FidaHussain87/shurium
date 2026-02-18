@@ -382,7 +382,20 @@ If you see JSON output, everything is working.
 
 ## Step 7: Create Your Wallet
 
-The wallet is created automatically when the daemon starts. You just need to generate addresses.
+### Wallet vs Address
+
+| Term | What It Is |
+|------|------------|
+| **Wallet** | Container holding all your keys/addresses. Created **automatically** when daemon starts. |
+| **Address** | A destination for receiving coins. You can have many addresses in one wallet. |
+
+**The wallet is created automatically** - you don't need to run any command. When the daemon starts for the first time, it creates:
+- `~/.shurium/regtest/wallet.dat` - Your encrypted private keys
+- `~/.shurium/regtest/wallet_data.dat` - Transaction history
+
+### Generate a New Address
+
+Addresses are generated from your wallet. Each address can receive coins independently.
 
 ```bash
 # Make sure you're in the build directory
