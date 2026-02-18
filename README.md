@@ -54,8 +54,13 @@ cd shurium
 # Build
 mkdir build && cd build
 cmake ..
-cmake --build .
+cmake --build . -j$(nproc)
 ```
+
+**Build outputs** are in `build/` directory:
+- `shuriumd` - Main daemon
+- `shurium-cli` - Command-line interface
+- `shurium-wallet-tool` - Wallet utility
 
 ### 2️⃣ Choose Your Network
 
@@ -63,44 +68,158 @@ cmake --build .
 |---------|---------|-------|---------|
 | **Mainnet** | `./shuriumd` | Real | Actual transactions |
 | **Testnet** | `./shuriumd --testnet` | Fake | Learning & testing |
+| **Regtest** | `./shuriumd --regtest` | Fake | Local development |
 
-**New users:** Start with testnet to learn, then switch to mainnet for real use.
+**New users:** Start with regtest for local testing, then testnet for network testing.
 
-### 3️⃣ Start Your Node
+### 3️⃣ Data Directories
 
-**For Real Money (Mainnet):**
+SHURIUM stores data in these locations:
+
+| Network | Data Directory | Config File |
+|---------|----------------|-------------|
+| Mainnet | `~/.shurium/` | `~/.shurium/shurium.conf` |
+| Testnet | `~/.shurium/testnet/` | `~/.shurium/shurium.conf` |
+| Regtest | `~/.shurium/regtest/` | `~/.shurium/shurium.conf` |
+
+**Data directory contents:**
+```
+~/.shurium/
+├── shurium.conf      # Configuration file (optional)
+├── debug.log         # Debug log file
+├── wallet.dat        # Encrypted wallet keys
+├── wallet_data.dat   # Wallet transaction data
+├── blocks/           # Block data
+├── chainstate/       # UTXO database
+└── peers.dat         # Known peers
+```
+
+### 4️⃣ Configuration (Optional)
+
+Create `~/.shurium/shurium.conf` if you need custom settings:
+
+```bash
+# Create config directory and file
+mkdir -p ~/.shurium
+cat > ~/.shurium/shurium.conf << 'EOF'
+# RPC settings (for remote access)
+rpcuser=shurium
+rpcpassword=yourpassword
+rpcallowip=127.0.0.1
+
+# Network settings
+listen=1
+maxconnections=125
+
+# Logging
+debug=1
+EOF
+```
+
+**Note:** The daemon works without a config file using sensible defaults.
+
+### 5️⃣ Start Your Node
+
+**IMPORTANT:** Run commands from the `build/` directory:
+
+```bash
+cd /path/to/shurium/build
+```
+
+**For Local Development (Regtest) - Recommended for beginners:**
 ```bash
 # Start daemon
-nohup ./shuriumd > /dev/null 2>&1 &
+./shuriumd --regtest --daemon
 
-# Use wallet
-./shurium-cli getbalance
-./shurium-cli getnewaddress "my wallet"
+# Wait 3 seconds for startup
+sleep 3
+
+# Verify it's running
+./shurium-cli --regtest getblockchaininfo
+
+# Generate mining address
+./shurium-cli --regtest getnewaddress
+
+# Mine 101 blocks (to get spendable coins)
+./shurium-cli --regtest generatetoaddress 101 <your-address>
+
+# Check balance (should be ~3400 SHR)
+./shurium-cli --regtest getbalance
+
+# Stop daemon when done
+./shurium-cli --regtest stop
 ```
 
 **For Practice (Testnet):**
 ```bash
 # Start daemon with --testnet
-nohup ./shuriumd --testnet > /dev/null 2>&1 &
+./shuriumd --testnet --daemon
 
 # Use wallet with --testnet
 ./shurium-cli --testnet getbalance
-./shurium-cli --testnet getnewaddress "test wallet"
+./shurium-cli --testnet getnewaddress
 ```
 
-### 4️⃣ Essential Commands
+**For Real Money (Mainnet):**
+```bash
+# Start daemon
+./shuriumd --daemon
 
-**Mainnet (real money):**
+# Use wallet
+./shurium-cli getbalance
+./shurium-cli getnewaddress
+```
 
-| What You Want | Command |
-|---------------|---------|
-| Check balance | `./shurium-cli getbalance` |
-| New address | `./shurium-cli getnewaddress` |
-| Wallet info | `./shurium-cli getwalletinfo` |
-| Stop daemon | `./shurium-cli stop` |
-| View logs | `tail -f ~/.shurium/debug.log` |
+### 6️⃣ Essential Commands
 
-**Testnet (fake money for practice):** Add `--testnet` to all commands.
+| What You Want | Regtest | Mainnet |
+|---------------|---------|---------|
+| Check balance | `./shurium-cli --regtest getbalance` | `./shurium-cli getbalance` |
+| New address | `./shurium-cli --regtest getnewaddress` | `./shurium-cli getnewaddress` |
+| Send coins | `./shurium-cli --regtest sendtoaddress <addr> <amount>` | `./shurium-cli sendtoaddress <addr> <amount>` |
+| Mine blocks | `./shurium-cli --regtest generatetoaddress <n> <addr>` | N/A (use miner) |
+| Wallet info | `./shurium-cli --regtest getwalletinfo` | `./shurium-cli getwalletinfo` |
+| Blockchain info | `./shurium-cli --regtest getblockchaininfo` | `./shurium-cli getblockchaininfo` |
+| Stop daemon | `./shurium-cli --regtest stop` | `./shurium-cli stop` |
+| View logs | `tail -f ~/.shurium/regtest/debug.log` | `tail -f ~/.shurium/debug.log` |
+| All commands | `./shurium-cli --regtest help` | `./shurium-cli help` |
+
+### 7️⃣ Troubleshooting
+
+**"no such file or directory: ./shuriumd"**
+```bash
+# You're not in the build directory. Navigate there first:
+cd /path/to/shurium/build
+ls -la shuriumd  # Verify binary exists
+```
+
+**"Cannot obtain a lock on data directory"**
+```bash
+# Another instance is running. Stop it first:
+./shurium-cli --regtest stop  # or --testnet, or no flag for mainnet
+# Or kill it manually:
+pkill shuriumd
+```
+
+**"Connection refused" when using shurium-cli**
+```bash
+# Daemon isn't running. Start it:
+./shuriumd --regtest --daemon
+sleep 3
+./shurium-cli --regtest getblockchaininfo
+```
+
+**Balance shows 0 after mining**
+```bash
+# Coinbase rewards need 100 confirmations. Mine more blocks:
+./shurium-cli --regtest generatetoaddress 101 $(./shurium-cli --regtest getnewaddress)
+```
+
+**Transaction rejected: "mempool min fee not met"**
+```bash
+# Transaction fee too low. This is now fixed in default settings.
+# If using custom fee, ensure feeRate >= 1000 sat/kvB
+```
 
 **🎉 That's it! You're running SHURIUM!**
 
