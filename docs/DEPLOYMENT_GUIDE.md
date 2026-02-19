@@ -105,8 +105,14 @@ chmod 700 ~/.shurium
 # Wait for startup
 sleep 5
 
-# Create a new wallet for government funds
+# Check if wallet exists
+./shurium-cli getwalletinfo
+
+# If wallet doesn't exist, create one:
 ./shurium-cli createwallet "GovernmentFunds"
+
+# If wallet already exists, you'll see "Wallet already loaded" - that's OK!
+# Just proceed to generate addresses.
 
 # Generate addresses for each fund
 echo "=== GENERATING GOVERNMENT FUND ADDRESSES ==="
@@ -126,6 +132,9 @@ echo "Ecosystem Fund Address: $ECO_ADDRESS"
 # Stability Reserve Address (5% of block rewards)
 STABILITY_ADDRESS=$(./shurium-cli getnewaddress "Stability_Reserve_Government")
 echo "Stability Reserve Address: $STABILITY_ADDRESS"
+
+# List all your addresses
+./shurium-cli listaddresses
 
 # Stop daemon
 ./shurium-cli stop
@@ -500,8 +509,9 @@ sleep 5
 ### 3.2 Create Wallet and Mining Address
 
 ```bash
-# Create your personal wallet
+# Create your personal wallet (skip if already exists)
 ./shurium-cli createwallet "MyWallet"
+# Note: If you see "Wallet already loaded", that's OK - proceed to next step
 
 # Generate your mining reward address
 MINING_ADDRESS=$(./shurium-cli getnewaddress "MiningRewards")
@@ -509,6 +519,9 @@ echo "Your Mining Address: $MINING_ADDRESS"
 
 # SAVE THIS ADDRESS! All your mining rewards will go here.
 echo $MINING_ADDRESS > ~/my_mining_address.txt
+
+# List all your addresses
+./shurium-cli listaddresses
 ```
 
 ### 3.3 Backup Your Wallet (IMPORTANT!)

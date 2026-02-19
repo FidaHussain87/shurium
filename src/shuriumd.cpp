@@ -19,6 +19,7 @@
 #include <shurium/miner/miner.h>
 #include <shurium/staking/staking.h>
 #include <shurium/crypto/keys.h>
+#include <shurium/economics/funds.h>
 
 #include <atomic>
 #include <chrono>
@@ -132,6 +133,12 @@ struct DaemonConfig {
     bool staking{false};
     std::string miningAddress;
     int miningThreads{1};
+    
+    // === Fund Addresses ===
+    std::string ubiAddress;
+    std::string contributionAddress;
+    std::string ecosystemAddress;
+    std::string stabilityAddress;
     
     // === Logging ===
     std::string logLevel{"info"};
@@ -639,6 +646,24 @@ void LoadConfigFile(DaemonConfig& config) {
         for (const auto& node : addNodes) {
             config.addNodes.push_back(node);
         }
+        
+        // Load fund addresses
+        if (parser.HasOption("ubiaddress")) {
+            config.ubiAddress = parser.GetString("ubiaddress");
+            LOG_INFO(util::LogCategory::DEFAULT) << "Loaded UBI address from config: " << config.ubiAddress;
+        }
+        if (parser.HasOption("contributionaddress")) {
+            config.contributionAddress = parser.GetString("contributionaddress");
+            LOG_INFO(util::LogCategory::DEFAULT) << "Loaded Contribution address from config: " << config.contributionAddress;
+        }
+        if (parser.HasOption("ecosystemaddress")) {
+            config.ecosystemAddress = parser.GetString("ecosystemaddress");
+            LOG_INFO(util::LogCategory::DEFAULT) << "Loaded Ecosystem address from config: " << config.ecosystemAddress;
+        }
+        if (parser.HasOption("stabilityaddress")) {
+            config.stabilityAddress = parser.GetString("stabilityaddress");
+            LOG_INFO(util::LogCategory::DEFAULT) << "Loaded Stability address from config: " << config.stabilityAddress;
+        }
     }
 }
 
@@ -1097,6 +1122,54 @@ int AppMain(int argc, char* argv[]) {
         LOG_ERROR(util::LogCategory::DEFAULT) << "Failed to initialize node";
         Shutdown();
         return 1;
+    }
+    
+    // ========================================================================
+    // Configure Fund Addresses from config file
+    // ========================================================================
+    
+    if (!g_config.ubiAddress.empty()) {
+        if (economics::GetFundManager().SetFundAddress(
+                economics::FundType::UBI, 
+                g_config.ubiAddress, 
+                economics::FundAddressSource::ConfigFile)) {
+            LOG_INFO(util::LogCategory::DEFAULT) << "Set UBI fund address: " << g_config.ubiAddress;
+        } else {
+            LOG_WARN(util::LogCategory::DEFAULT) << "Failed to set UBI fund address: " << g_config.ubiAddress;
+        }
+    }
+    
+    if (!g_config.contributionAddress.empty()) {
+        if (economics::GetFundManager().SetFundAddress(
+                economics::FundType::Contribution, 
+                g_config.contributionAddress, 
+                economics::FundAddressSource::ConfigFile)) {
+            LOG_INFO(util::LogCategory::DEFAULT) << "Set Contribution fund address: " << g_config.contributionAddress;
+        } else {
+            LOG_WARN(util::LogCategory::DEFAULT) << "Failed to set Contribution fund address: " << g_config.contributionAddress;
+        }
+    }
+    
+    if (!g_config.ecosystemAddress.empty()) {
+        if (economics::GetFundManager().SetFundAddress(
+                economics::FundType::Ecosystem, 
+                g_config.ecosystemAddress, 
+                economics::FundAddressSource::ConfigFile)) {
+            LOG_INFO(util::LogCategory::DEFAULT) << "Set Ecosystem fund address: " << g_config.ecosystemAddress;
+        } else {
+            LOG_WARN(util::LogCategory::DEFAULT) << "Failed to set Ecosystem fund address: " << g_config.ecosystemAddress;
+        }
+    }
+    
+    if (!g_config.stabilityAddress.empty()) {
+        if (economics::GetFundManager().SetFundAddress(
+                economics::FundType::Stability, 
+                g_config.stabilityAddress, 
+                economics::FundAddressSource::ConfigFile)) {
+            LOG_INFO(util::LogCategory::DEFAULT) << "Set Stability fund address: " << g_config.stabilityAddress;
+        } else {
+            LOG_WARN(util::LogCategory::DEFAULT) << "Failed to set Stability fund address: " << g_config.stabilityAddress;
+        }
     }
     
     // Start P2P network
