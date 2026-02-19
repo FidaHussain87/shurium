@@ -1,6 +1,6 @@
 /**
  * SHURIUM Mobile Wallet - Main Navigation
- * App navigation configuration
+ * App navigation configuration with all screens
  */
 
 import React from 'react';
@@ -9,31 +9,32 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
 
-// Import screens
+// Import all screens
 import { HomeScreen } from '../screens/HomeScreen';
 import { SendScreen } from '../screens/SendScreen';
-// These will be implemented later
-// import { ReceiveScreen } from '../screens/ReceiveScreen';
-// import { StakingScreen } from '../screens/StakingScreen';
-// import { UBIScreen } from '../screens/UBIScreen';
-// import { SettingsScreen } from '../screens/SettingsScreen';
-// import { TransactionsScreen } from '../screens/TransactionsScreen';
+import { ReceiveScreen } from '../screens/ReceiveScreen';
+import { StakingScreen } from '../screens/StakingScreen';
+import { UBIScreen } from '../screens/UBIScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+import { TransactionsScreen } from '../screens/TransactionsScreen';
+import { FaucetScreen } from '../screens/FaucetScreen';
 
-// Placeholder screens for now
-const PlaceholderScreen: React.FC<{ name: string }> = ({ name }) => (
-  <View style={styles.placeholder}>
-    <Text style={styles.placeholderText}>{name} Screen</Text>
-    <Text style={styles.placeholderSubtext}>Coming soon</Text>
-  </View>
-);
-
-const ReceiveScreen = () => <PlaceholderScreen name="Receive" />;
-const StakingScreen = () => <PlaceholderScreen name="Staking" />;
-const UBIScreen = () => <PlaceholderScreen name="UBI" />;
-const SettingsScreen = () => <PlaceholderScreen name="Settings" />;
-const TransactionsScreen = () => <PlaceholderScreen name="Transactions" />;
-const FaucetScreen = () => <PlaceholderScreen name="Faucet" />;
-const TransactionDetailScreen = () => <PlaceholderScreen name="Transaction Detail" />;
+// Transaction Detail Screen (inline for simplicity)
+const TransactionDetailScreen: React.FC<{ route: any }> = ({ route }) => {
+  const { txid } = route.params || {};
+  return (
+    <View style={styles.detailContainer}>
+      <Text style={styles.detailTitle}>Transaction Details</Text>
+      <View style={styles.detailCard}>
+        <Text style={styles.detailLabel}>Transaction ID</Text>
+        <Text style={styles.detailValue} selectable>{txid || 'Unknown'}</Text>
+      </View>
+      <Text style={styles.detailHint}>
+        Full transaction details will be fetched from the blockchain
+      </Text>
+    </View>
+  );
+};
 
 // Navigation types
 export type RootStackParamList = {
@@ -77,10 +78,10 @@ const DarkTheme = {
 const TabIcon: React.FC<{ name: string; focused: boolean }> = ({ name, focused }) => {
   const getIcon = () => {
     switch (name) {
-      case 'Home': return 'H';
-      case 'Wallet': return 'W';
-      case 'Stake': return 'S';
-      case 'Settings': return 'G';
+      case 'Home': return '⌂';
+      case 'Wallet': return '◈';
+      case 'Stake': return '◎';
+      case 'Settings': return '⚙';
       default: return '?';
     }
   };
@@ -218,22 +219,6 @@ export const AppNavigation: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  placeholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#121212',
-  },
-  placeholderText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  placeholderSubtext: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 8,
-  },
   tabIcon: {
     width: 32,
     height: 32,
@@ -247,11 +232,43 @@ const styles = StyleSheet.create({
   },
   tabIconText: {
     color: '#666',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
   },
   tabIconTextFocused: {
     color: '#2196F3',
+  },
+  detailContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+    padding: 16,
+  },
+  detailTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  detailCard: {
+    backgroundColor: '#1E1E1E',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  detailLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  detailValue: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'monospace',
+  },
+  detailHint: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 
