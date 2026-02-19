@@ -229,6 +229,18 @@ double GetRequiredParam<double>(const RPCRequest& req, const std::string& name) 
     return param.GetDouble();
 }
 
+template<>
+double GetRequiredParam<double>(const RPCRequest& req, size_t index) {
+    const JSONValue& param = req.GetParam(index);
+    if (param.IsNull()) {
+        throw std::runtime_error("Missing required parameter at index " + std::to_string(index));
+    }
+    if (!param.IsNumber()) {
+        throw std::runtime_error("Parameter at index " + std::to_string(index) + " must be a number");
+    }
+    return param.GetDouble();
+}
+
 // Template specializations for GetOptionalParam
 template<>
 std::string GetOptionalParam<std::string>(const RPCRequest& req, const std::string& name, const std::string& defaultValue) {
@@ -275,6 +287,13 @@ bool GetOptionalParam<bool>(const RPCRequest& req, size_t index, const bool& def
 template<>
 double GetOptionalParam<double>(const RPCRequest& req, const std::string& name, const double& defaultValue) {
     const JSONValue& param = req.GetParam(name);
+    if (param.IsNull()) return defaultValue;
+    return param.IsNumber() ? param.GetDouble() : defaultValue;
+}
+
+template<>
+double GetOptionalParam<double>(const RPCRequest& req, size_t index, const double& defaultValue) {
+    const JSONValue& param = req.GetParam(index);
     if (param.IsNull()) return defaultValue;
     return param.IsNumber() ? param.GetDouble() : defaultValue;
 }
@@ -1404,6 +1423,38 @@ void RPCCommandTable::RegisterMiningCommands() {
         false, false,
         {"problemid"},
         {"The problem ID"}
+    });
+    
+    commands_.push_back({
+        "createproblem",
+        Category::MINING,
+        "Create a new computational problem in the PoUW marketplace.\n"
+        "Arguments:\n"
+        "1. type          (string, required) Problem type (ml_training, optimization, etc.)\n"
+        "2. description   (string, required) Problem description\n"
+        "3. reward        (numeric, required) Reward amount in SHR\n"
+        "4. deadline      (numeric, optional) Deadline in seconds from now (default: 86400)\n"
+        "5. input_data    (string, optional) Input data in hex\n"
+        "6. parameters    (string, optional) JSON parameters\n"
+        "7. bonus_reward  (numeric, optional) Bonus reward for early submission",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_createproblem(req, ctx, table);
+        },
+        true, false,
+        {"type", "description", "reward", "deadline", "input_data", "parameters", "bonus_reward"},
+        {"Problem type", "Description", "Reward in SHR", "Deadline seconds", "Input data hex", "JSON params", "Bonus reward"}
+    });
+    
+    commands_.push_back({
+        "getmarketplaceinfo",
+        Category::MINING,
+        "Get PoUW marketplace statistics and configuration.",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_getmarketplaceinfo(req, ctx, table);
+        },
+        false, false,
+        {},
+        {}
     });
     
     commands_.push_back({
@@ -6338,22 +6389,92 @@ RPCResponse cmd_submitblock(const RPCRequest& req, const RPCContext& ctx,
 
 RPCResponse cmd_getwork(const RPCRequest& req, const RPCContext& ctx,
                         RPCCommandTable* table) {
-    JSONValue::Object result;
-    
-    result["problemId"] = "0000000000000000000000000000000000000000000000000000000000000000";
-    result["problemType"] = "optimization";
-    result["difficulty"] = 1.0;
-    result["data"] = "";
-    result["target"] = "0000000000000000000000000000000000000000000000000000000000000000";
-    result["expires"] = GetTime() + 600;
-    
-    return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+    try {
+        // Access the marketplace
+        auto& marketplace = marketplace::Marketplace::Instance();
+        
+        // Get the highest reward problem or any available problem
+        const marketplace::Problem* problem = marketplace.GetHighestRewardProblem();
+        
+        // If no highest reward problem, try to get any pending problem
+        if (!problem) {
+            auto pending = marketplace.GetPendingProblems(1);
+            if (!pending.empty()) {
+                problem = pending[0];
+            }
+        }
+        
+        JSONValue::Object result;
+        
+        if (problem && !problem->IsExpired() && !problem->IsSolved()) {
+            // Return the actual problem
+            result["problemId"] = FormatHex(problem->GetHash().data(), problem->GetHash().size());
+            result["problemType"] = marketplace::ProblemTypeToString(problem->GetType());
+            result["difficulty"] = static_cast<double>(problem->GetDifficulty().target) / 0xFFFFFFFF;
+            
+            // Encode input data as hex
+            const auto& inputData = problem->GetSpec().GetInputData();
+            std::string dataHex;
+            for (auto byte : inputData) {
+                char buf[3];
+                snprintf(buf, sizeof(buf), "%02x", byte);
+                dataHex += buf;
+            }
+            result["data"] = dataHex;
+            
+            // Target as hex (lower = harder)
+            uint64_t target = problem->GetDifficulty().target;
+            std::ostringstream targetHex;
+            for (int i = 0; i < 32; ++i) {
+                if (i < 8) {
+                    targetHex << std::setfill('0') << std::setw(2) << std::hex 
+                              << ((target >> ((7-i) * 8)) & 0xFF);
+                } else {
+                    targetHex << "ff";  // Fill rest with FF (easy)
+                }
+            }
+            result["target"] = targetHex.str();
+            result["expires"] = problem->GetDeadline();
+            result["reward"] = FormatAmount(problem->GetReward());
+            result["description"] = problem->GetSpec().GetDescription();
+            result["id"] = std::to_string(problem->GetId());
+        } else {
+            // No work available - return empty stub
+            result["problemId"] = "0000000000000000000000000000000000000000000000000000000000000000";
+            result["problemType"] = "none";
+            result["difficulty"] = 0.0;
+            result["data"] = "";
+            result["target"] = "0000000000000000000000000000000000000000000000000000000000000000";
+            result["expires"] = int64_t(0);
+            result["message"] = "No work available";
+        }
+        
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
+    }
 }
 
 RPCResponse cmd_submitwork(const RPCRequest& req, const RPCContext& ctx,
                            RPCCommandTable* table) {
     try {
-        std::string problemIdStr = GetRequiredParam<std::string>(req, size_t(0));
+        // Get problem ID - accept either string or number
+        std::string problemIdStr;
+        const JSONValue& param0 = req.GetParam(size_t(0));
+        if (param0.IsNull()) {
+            throw std::runtime_error("Missing required parameter: problemid");
+        }
+        if (param0.IsString()) {
+            problemIdStr = param0.GetString();
+        } else if (param0.IsInt()) {
+            problemIdStr = std::to_string(param0.GetInt());
+        } else if (param0.IsNumber()) {
+            problemIdStr = std::to_string(static_cast<int64_t>(param0.GetDouble()));
+        } else {
+            throw std::runtime_error("Parameter problemid must be string or number");
+        }
+        
         std::string solutionHex = GetRequiredParam<std::string>(req, size_t(1));
         std::string solverAddress = GetOptionalParam<std::string>(req, size_t(2), "");
         
@@ -6549,7 +6670,21 @@ RPCResponse cmd_listproblems(const RPCRequest& req, const RPCContext& ctx,
 RPCResponse cmd_getproblem(const RPCRequest& req, const RPCContext& ctx,
                            RPCCommandTable* table) {
     try {
-        std::string problemIdStr = GetRequiredParam<std::string>(req, size_t(0));
+        // Get parameter - accept either string or number
+        std::string problemIdStr;
+        const JSONValue& param = req.GetParam(size_t(0));
+        if (param.IsNull()) {
+            throw std::runtime_error("Missing required parameter: problemid");
+        }
+        if (param.IsString()) {
+            problemIdStr = param.GetString();
+        } else if (param.IsInt()) {
+            problemIdStr = std::to_string(param.GetInt());
+        } else if (param.IsNumber()) {
+            problemIdStr = std::to_string(static_cast<int64_t>(param.GetDouble()));
+        } else {
+            throw std::runtime_error("Parameter must be string or number");
+        }
         
         // Access the marketplace
         auto& marketplace = marketplace::Marketplace::Instance();
@@ -6629,6 +6764,239 @@ RPCResponse cmd_getproblem(const RPCRequest& req, const RPCContext& ctx,
         result["specification"] = JSONValue(std::move(specObj));
         
         return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
+    }
+}
+
+// ============================================================================
+// createproblem - Submit a computational problem to the marketplace
+// ============================================================================
+
+RPCResponse cmd_createproblem(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table) {
+    wallet::Wallet* wallet = table->GetWallet();
+    if (!wallet) {
+        return RPCResponse::Error(ErrorCode::WALLET_NOT_FOUND, "Wallet not loaded", req.GetId());
+    }
+    
+    try {
+        // Parse required parameters
+        std::string typeStr = GetRequiredParam<std::string>(req, size_t(0));
+        std::string description = GetRequiredParam<std::string>(req, size_t(1));
+        double rewardAmount = GetRequiredParam<double>(req, size_t(2));
+        
+        // Parse optional parameters
+        int64_t deadlineSeconds = GetOptionalParam<int64_t>(req, size_t(3), 86400);  // Default: 1 day
+        std::string inputDataHex = GetOptionalParam<std::string>(req, size_t(4), "");
+        std::string parametersJson = GetOptionalParam<std::string>(req, size_t(5), "{}");
+        double bonusRewardAmount = GetOptionalParam<double>(req, size_t(6), 0.0);
+        
+        // Validate problem type
+        auto problemType = marketplace::ProblemTypeFromString(typeStr);
+        if (!problemType) {
+            return InvalidParams(
+                "Invalid problem type. Valid types: ml_training, ml_inference, "
+                "linear_algebra, hash_pow, simulation, data_processing, optimization, "
+                "cryptographic, custom", req.GetId());
+        }
+        
+        // Convert reward to base units
+        Amount reward = static_cast<Amount>(rewardAmount * COIN);
+        Amount bonusReward = static_cast<Amount>(bonusRewardAmount * COIN);
+        
+        // Validate reward
+        auto& marketplace = marketplace::Marketplace::Instance();
+        const auto& config = marketplace.GetConfig();
+        
+        if (reward < config.minProblemReward) {
+            std::ostringstream oss;
+            oss << "Reward too low. Minimum: " << std::fixed << std::setprecision(8) 
+                << (static_cast<double>(config.minProblemReward) / COIN) << " SHR";
+            return InvalidParams(oss.str(), req.GetId());
+        }
+        
+        if (reward > config.maxProblemReward) {
+            std::ostringstream oss;
+            oss << "Reward too high. Maximum: " << std::fixed << std::setprecision(8)
+                << (static_cast<double>(config.maxProblemReward) / COIN) << " SHR";
+            return InvalidParams(oss.str(), req.GetId());
+        }
+        
+        // Validate deadline
+        if (deadlineSeconds < config.minDeadline) {
+            std::ostringstream oss;
+            oss << "Deadline too short. Minimum: " << config.minDeadline << " seconds";
+            return InvalidParams(oss.str(), req.GetId());
+        }
+        
+        if (deadlineSeconds > config.maxDeadline) {
+            std::ostringstream oss;
+            oss << "Deadline too long. Maximum: " << config.maxDeadline << " seconds";
+            return InvalidParams(oss.str(), req.GetId());
+        }
+        
+        // Check wallet balance
+        Amount totalCost = reward + bonusReward;
+        if (wallet->GetBalance().confirmed < totalCost) {
+            std::ostringstream oss;
+            oss << "Insufficient balance. Required: " << std::fixed << std::setprecision(8)
+                << (static_cast<double>(totalCost) / COIN) << " SHR"
+                << ", Available: " << (static_cast<double>(wallet->GetBalance().confirmed) / COIN) << " SHR";
+            return RPCResponse::Error(ErrorCode::WALLET_INSUFFICIENT_FUNDS, oss.str(), req.GetId());
+        }
+        
+        // Parse input data from hex
+        std::vector<uint8_t> inputData;
+        if (!inputDataHex.empty()) {
+            for (size_t i = 0; i + 1 < inputDataHex.length(); i += 2) {
+                try {
+                    std::string byte = inputDataHex.substr(i, 2);
+                    inputData.push_back(static_cast<uint8_t>(std::stoul(byte, nullptr, 16)));
+                } catch (...) {
+                    return InvalidParams("Invalid hex in input data", req.GetId());
+                }
+            }
+        }
+        
+        // For non-hash_pow problems, provide default input data if none specified
+        // This uses the description as the "problem data"
+        if (inputData.empty() && *problemType != marketplace::ProblemType::HASH_POW) {
+            // Use the description as input data
+            inputData.assign(description.begin(), description.end());
+        }
+        
+        // Create problem specification
+        marketplace::ProblemSpec spec(*problemType);
+        spec.SetDescription(description);
+        spec.SetInputData(std::move(inputData));
+        spec.SetParameters(parametersJson);
+        
+        // Create problem
+        marketplace::Problem problem(spec);
+        
+        // Set difficulty (default for now, can be customized later)
+        marketplace::ProblemDifficulty difficulty;
+        difficulty.target = 0x00000000FFFFFFFF;  // Default target
+        difficulty.estimatedTime = 60;  // 60 seconds estimated
+        difficulty.operations = 1000000;  // 1M operations
+        problem.SetDifficulty(difficulty);
+        
+        // Set rewards
+        problem.SetReward(reward);
+        problem.SetBonusReward(bonusReward);
+        
+        // Set timing
+        problem.SetCreationTime(GetTime());
+        problem.SetDeadline(GetTime() + deadlineSeconds);
+        
+        // Set creator from wallet
+        auto addresses = wallet->GetAddresses();
+        if (!addresses.empty()) {
+            problem.SetCreator(addresses[0]);
+        }
+        
+        // Compute hash
+        problem.ComputeHash();
+        
+        // Submit to marketplace
+        auto problemId = marketplace.SubmitProblem(std::move(problem));
+        
+        if (problemId == marketplace::Problem::INVALID_ID) {
+            return RPCResponse::Error(ErrorCode::INTERNAL_ERROR, 
+                "Failed to submit problem to marketplace", req.GetId());
+        }
+        
+        // Get the submitted problem for response
+        const auto* submittedProblem = marketplace.GetProblem(problemId);
+        
+        JSONValue::Object result;
+        result["success"] = true;
+        result["problemId"] = std::to_string(problemId);
+        result["hash"] = submittedProblem ? 
+            FormatHex(submittedProblem->GetHash().data(), submittedProblem->GetHash().size()) : "";
+        result["type"] = typeStr;
+        result["description"] = description;
+        result["reward"] = FormatAmount(reward);
+        result["bonus_reward"] = FormatAmount(bonusReward);
+        result["deadline"] = GetTime() + deadlineSeconds;
+        result["expires_in"] = deadlineSeconds;
+        result["status"] = "pending";
+        
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
+    }
+}
+
+// ============================================================================
+// getmarketplaceinfo - Get marketplace statistics and configuration
+// ============================================================================
+
+RPCResponse cmd_getmarketplaceinfo(const RPCRequest& req, const RPCContext& ctx,
+                                    RPCCommandTable* table) {
+    try {
+        auto& marketplace = marketplace::Marketplace::Instance();
+        auto stats = marketplace.GetStats();
+        const auto& config = marketplace.GetConfig();
+        
+        JSONValue::Object result;
+        
+        // General status
+        result["running"] = marketplace.IsRunning();
+        
+        // Statistics
+        JSONValue::Object statsObj;
+        statsObj["total_problems"] = static_cast<int64_t>(stats.totalProblems);
+        statsObj["total_solved"] = static_cast<int64_t>(stats.totalSolved);
+        statsObj["total_expired"] = static_cast<int64_t>(stats.totalExpired);
+        statsObj["total_solutions"] = static_cast<int64_t>(stats.totalSolutions);
+        statsObj["total_accepted"] = static_cast<int64_t>(stats.totalAccepted);
+        statsObj["total_rejected"] = static_cast<int64_t>(stats.totalRejected);
+        statsObj["total_rewards"] = FormatAmount(stats.totalRewards);
+        statsObj["total_rewards_raw"] = static_cast<int64_t>(stats.totalRewards);
+        statsObj["pending_problems"] = static_cast<int64_t>(stats.pendingProblems);
+        statsObj["pending_solutions"] = static_cast<int64_t>(stats.pendingSolutions);
+        statsObj["avg_solution_time_ms"] = static_cast<int64_t>(stats.avgSolutionTime);
+        statsObj["avg_verification_time_ms"] = static_cast<int64_t>(stats.avgVerificationTime);
+        result["statistics"] = JSONValue(std::move(statsObj));
+        
+        // Configuration
+        JSONValue::Object configObj;
+        configObj["max_pending_problems"] = static_cast<int64_t>(config.maxPendingProblems);
+        configObj["max_solutions_per_problem"] = static_cast<int64_t>(config.maxSolutionsPerProblem);
+        configObj["min_problem_reward"] = FormatAmount(config.minProblemReward);
+        configObj["max_problem_reward"] = FormatAmount(config.maxProblemReward);
+        configObj["min_deadline_seconds"] = static_cast<int64_t>(config.minDeadline);
+        configObj["max_deadline_seconds"] = static_cast<int64_t>(config.maxDeadline);
+        configObj["verification_timeout_ms"] = static_cast<int64_t>(config.verificationTimeout);
+        configObj["max_concurrent_verifications"] = static_cast<int64_t>(config.maxConcurrentVerifications);
+        configObj["auto_expire_problems"] = config.autoExpireProblems;
+        result["configuration"] = JSONValue(std::move(configObj));
+        
+        // Problem types by count
+        JSONValue::Object typeCountsObj;
+        for (const auto& [type, count] : stats.problemsByType) {
+            typeCountsObj[marketplace::ProblemTypeToString(type)] = static_cast<int64_t>(count);
+        }
+        result["problems_by_type"] = JSONValue(std::move(typeCountsObj));
+        
+        // Supported problem types
+        JSONValue::Array supportedTypes;
+        supportedTypes.push_back(JSONValue("ml_training"));
+        supportedTypes.push_back(JSONValue("ml_inference"));
+        supportedTypes.push_back(JSONValue("linear_algebra"));
+        supportedTypes.push_back(JSONValue("hash_pow"));
+        supportedTypes.push_back(JSONValue("simulation"));
+        supportedTypes.push_back(JSONValue("data_processing"));
+        supportedTypes.push_back(JSONValue("optimization"));
+        supportedTypes.push_back(JSONValue("cryptographic"));
+        supportedTypes.push_back(JSONValue("custom"));
+        result["supported_problem_types"] = JSONValue(std::move(supportedTypes));
+        
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        
     } catch (const std::exception& e) {
         return InvalidParams(e.what(), req.GetId());
     }

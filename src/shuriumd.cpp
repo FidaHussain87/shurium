@@ -24,6 +24,7 @@
 #include <shurium/economics/reward.h>
 #include <shurium/identity/identity.h>
 #include <shurium/governance/governance.h>
+#include <shurium/marketplace/marketplace.h>
 
 #include <atomic>
 #include <chrono>
@@ -1262,6 +1263,11 @@ int AppMain(int argc, char* argv[]) {
     if (g_rpcCommands) {
         g_rpcCommands->SetGovernanceEngine(g_governanceEngine);
     }
+    
+    // Initialize and start the PoUW marketplace
+    auto& marketplace = marketplace::Marketplace::Instance();
+    marketplace.Start();
+    LOG_INFO(util::LogCategory::DEFAULT) << "PoUW Marketplace started";
     
     // Initialize miner (create even if not starting, for setgenerate support)
     // Get mining address (from config or wallet)

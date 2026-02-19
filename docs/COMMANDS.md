@@ -1279,29 +1279,111 @@ Submits a mined block to the network.
 
 ---
 
-### getwork
+## 🧮 Proof of Useful Work (PoUW) Marketplace
 
-Gets PoUW (Proof of Useful Work) problem.
+SHURIUM's PoUW system replaces wasteful hash-based mining with a marketplace where computational problems are solved for real value. Users submit computational problems (with rewards), and miners solve them to earn rewards.
+
+### Supported Problem Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `ml_training` | Machine learning model training | Train neural networks |
+| `ml_inference` | ML model inference/benchmarking | Run model predictions |
+| `linear_algebra` | Matrix operations | Scientific computing |
+| `hash_pow` | Hash-based proof (fallback) | Traditional mining |
+| `simulation` | Scientific simulations | Physics, chemistry, etc. |
+| `data_processing` | Data ETL/transformation | Big data processing |
+| `optimization` | Optimization problems | Find optimal solutions |
+| `cryptographic` | Cryptographic computations | Key generation, etc. |
+| `custom` | Custom verifiable computation | Any verifiable task |
+
+---
+
+### getmarketplaceinfo
+
+Returns marketplace statistics and configuration.
 
 ```bash
-./shurium-cli getwork
+./shurium-cli getmarketplaceinfo
+```
+
+**Example Output:**
+```json
+{
+  "running": true,
+  "statistics": {
+    "total_problems": 5,
+    "total_solved": 3,
+    "total_expired": 1,
+    "pending_problems": 1,
+    "total_rewards": "250.00000000"
+  },
+  "configuration": {
+    "min_problem_reward": "0.00001000",
+    "max_problem_reward": "10.00000000",
+    "min_deadline_seconds": 60,
+    "max_deadline_seconds": 2592000
+  },
+  "supported_problem_types": [
+    "ml_training", "ml_inference", "linear_algebra", "hash_pow",
+    "simulation", "data_processing", "optimization", "cryptographic", "custom"
+  ]
+}
 ```
 
 ---
 
-### submitwork
+### createproblem
 
-Submits PoUW solution.
+Create a new computational problem in the marketplace.
 
 ```bash
-./shurium-cli submitwork "PROBLEM_ID" "SOLUTION"
+./shurium-cli createproblem TYPE "DESCRIPTION" REWARD [DEADLINE] [INPUT_DATA_HEX] [PARAMS_JSON] [BONUS]
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| TYPE | string | Yes | Problem type (see table above) |
+| DESCRIPTION | string | Yes | Problem description |
+| REWARD | number | Yes | Reward amount in SHR |
+| DEADLINE | number | No | Deadline in seconds (default: 86400) |
+| INPUT_DATA_HEX | string | No | Input data as hex string |
+| PARAMS_JSON | string | No | JSON parameters |
+| BONUS | number | No | Bonus reward for early submission |
+
+**Examples:**
+```bash
+# Create simple optimization problem
+./shurium-cli createproblem "optimization" "Find minimum of f(x) = x^2 + 2x + 1" 10 3600
+
+# Create ML training problem with 24-hour deadline
+./shurium-cli createproblem "ml_training" "Train sentiment classifier on dataset" 50 86400
+
+# Create problem with input data
+./shurium-cli createproblem "data_processing" "Process CSV data" 5 7200 "64617461"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "problemId": "1",
+  "hash": "5cb4323036546d8fe68c90f2b41219d0ee666e815b7148dd4bc168f95dbb4dc9",
+  "type": "optimization",
+  "description": "Find minimum of f(x) = x^2 + 2x + 1",
+  "reward": "10.00000000",
+  "deadline": 1771515656,
+  "expires_in": 3600,
+  "status": "pending"
+}
 ```
 
 ---
 
 ### listproblems
 
-Lists PoUW problems.
+Lists PoUW problems in the marketplace.
 
 ```bash
 ./shurium-cli listproblems [status]
@@ -1309,9 +1391,143 @@ Lists PoUW problems.
 
 | Status | Description |
 |--------|-------------|
-| pending | Waiting for solution |
-| solved | Completed |
-| expired | Timed out |
+| `pending` | Waiting for solution (default) |
+| `solved` | Completed |
+| `expired` | Timed out |
+| `all` | All problems |
+
+**Example:**
+```bash
+./shurium-cli listproblems "pending"
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "1",
+    "hash": "5cb4323036546d8fe68c90f2b41219d0ee666e815b7148dd4bc168f95dbb4dc9",
+    "type": "optimization",
+    "status": "pending",
+    "creator": "shr1q54jrl9vd3dx8jdm2f6gkx3pqkzzjfcemretx85",
+    "reward": "10.00000000",
+    "deadline": 1771515656,
+    "expires_in": 3500,
+    "difficulty": {
+      "target": 4294967295,
+      "estimated_time": 60,
+      "operations": 1000000
+    }
+  }
+]
+```
+
+---
+
+### getproblem
+
+Get detailed information about a specific problem.
+
+```bash
+./shurium-cli getproblem PROBLEM_ID
+```
+
+**Example:**
+```bash
+./shurium-cli getproblem 1
+```
+
+---
+
+### getwork
+
+Get a problem to work on. Returns the highest-reward pending problem.
+
+```bash
+./shurium-cli getwork
+```
+
+**Response:**
+```json
+{
+  "problemId": "5cb4323036546d8fe68c90f2b41219d0ee666e815b7148dd4bc168f95dbb4dc9",
+  "problemType": "optimization",
+  "difficulty": 1.0,
+  "data": "4d696e696d697a652066287829203d20785e32202b203278202b2031",
+  "target": "00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "expires": 1771515656,
+  "reward": "10.00000000",
+  "description": "Find minimum of f(x) = x^2 + 2x + 1",
+  "id": "1"
+}
+```
+
+If no work is available:
+```json
+{
+  "problemId": "0000000000000000000000000000000000000000000000000000000000000000",
+  "problemType": "none",
+  "message": "No work available"
+}
+```
+
+---
+
+### submitwork
+
+Submit a solution to a problem.
+
+```bash
+./shurium-cli submitwork PROBLEM_ID SOLUTION_HEX
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| PROBLEM_ID | string/number | Yes | Problem ID or hash |
+| SOLUTION_HEX | string | Yes | Solution data as hex |
+
+**Example:**
+```bash
+# Submit solution (x = -1 for minimization problem)
+./shurium-cli submitwork 1 "2d31"
+```
+
+**Response:**
+```json
+{
+  "accepted": true,
+  "solution_id": "1",
+  "problem_id": "1",
+  "status": "pending_verification",
+  "message": "Solution submitted for verification",
+  "solver": "shr1q..."
+}
+```
+
+---
+
+### Complete PoUW Workflow Example
+
+```bash
+# 1. Check marketplace status
+./shurium-cli getmarketplaceinfo
+
+# 2. Create a computational problem (as problem creator)
+./shurium-cli createproblem "optimization" "Find x where f(x)=0 for f(x)=x+5" 10 7200
+
+# 3. List available problems
+./shurium-cli listproblems "pending"
+
+# 4. Get work (as miner)
+./shurium-cli getwork
+
+# 5. Submit solution (x = -5)
+./shurium-cli submitwork 1 "2d35"
+
+# 6. Check problem status
+./shurium-cli getproblem 1
+```
 
 ---
 
