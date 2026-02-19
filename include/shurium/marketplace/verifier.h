@@ -227,6 +227,37 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
+/**
+ * Generic verifier for various problem types.
+ * 
+ * Provides basic verification for problem types that don't have
+ * specialized verifiers. Validates solution format and computes
+ * a basic quality score.
+ */
+class GenericVerifier : public IVerifier {
+public:
+    explicit GenericVerifier(ProblemType type);
+    ~GenericVerifier() override;
+    
+    ProblemType GetType() const override { return type_; }
+    
+    VerificationDetails Verify(
+        const Problem& problem,
+        const Solution& solution) override;
+    
+    bool QuickValidate(
+        const Problem& problem,
+        const Solution& solution) override;
+    
+    uint64_t EstimateVerificationTime(
+        const Problem& problem) const override;
+
+private:
+    ProblemType type_;
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
 // ============================================================================
 // Verifier Registry
 // ============================================================================

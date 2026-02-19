@@ -6463,7 +6463,7 @@ RPCResponse cmd_submitwork(const RPCRequest& req, const RPCContext& ctx,
         std::string problemIdStr;
         const JSONValue& param0 = req.GetParam(size_t(0));
         if (param0.IsNull()) {
-            throw std::runtime_error("Missing required parameter: problemid");
+            return InvalidParams("Missing required parameter: problemid", req.GetId());
         }
         if (param0.IsString()) {
             problemIdStr = param0.GetString();
@@ -6472,10 +6472,25 @@ RPCResponse cmd_submitwork(const RPCRequest& req, const RPCContext& ctx,
         } else if (param0.IsNumber()) {
             problemIdStr = std::to_string(static_cast<int64_t>(param0.GetDouble()));
         } else {
-            throw std::runtime_error("Parameter problemid must be string or number");
+            return InvalidParams("Parameter problemid must be string or number", req.GetId());
         }
         
-        std::string solutionHex = GetRequiredParam<std::string>(req, size_t(1));
+        // Get solution - accept either string or number (for flexibility)
+        std::string solutionHex;
+        const JSONValue& param1 = req.GetParam(size_t(1));
+        if (param1.IsNull()) {
+            return InvalidParams("Missing required parameter: solution", req.GetId());
+        }
+        if (param1.IsString()) {
+            solutionHex = param1.GetString();
+        } else if (param1.IsInt()) {
+            solutionHex = std::to_string(param1.GetInt());
+        } else if (param1.IsNumber()) {
+            solutionHex = std::to_string(static_cast<int64_t>(param1.GetDouble()));
+        } else {
+            return InvalidParams("Parameter solution must be string", req.GetId());
+        }
+        
         std::string solverAddress = GetOptionalParam<std::string>(req, size_t(2), "");
         
         // Access the marketplace

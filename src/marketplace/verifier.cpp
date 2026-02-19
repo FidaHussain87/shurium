@@ -376,6 +376,110 @@ uint64_t LinearAlgebraVerifier::EstimateVerificationTime(
 }
 
 // ============================================================================
+// GenericVerifier Implementation
+// ============================================================================
+
+class GenericVerifier::Impl {
+public:
+    // No specific state needed
+};
+
+GenericVerifier::GenericVerifier(ProblemType type) 
+    : type_(type), impl_(std::make_unique<Impl>()) {}
+
+GenericVerifier::~GenericVerifier() = default;
+
+VerificationDetails GenericVerifier::Verify(
+    const Problem& problem,
+    const Solution& solution) {
+    
+    VerificationDetails details;
+    auto startTime = std::chrono::steady_clock::now();
+    
+    // Quick validation first
+    if (!QuickValidate(problem, solution)) {
+        details.result = VerificationResult::MALFORMED;
+        details.errorMessage = "Quick validation failed";
+        return details;
+    }
+    
+    // Basic structure checks
+    const auto& resultData = solution.GetData().GetResult();
+    const auto& resultHash = solution.GetData().GetResultHash();
+    
+    // 1. Check that result data is non-empty
+    details.AddCheck("result_non_empty", !resultData.empty());
+    
+    // 2. Verify the result hash matches computed hash
+    Hash256 computedHash;
+    SHA256 hasher;
+    hasher.Write(resultData.data(), resultData.size());
+    hasher.Finalize(computedHash.data());
+    details.AddCheck("hash_valid", computedHash == resultHash);
+    
+    // 3. Check solver is specified
+    details.AddCheck("solver_specified", !solution.GetSolver().empty());
+    
+    // 4. Check problem reference
+    details.AddCheck("problem_match", solution.GetProblemId() == problem.GetId());
+    
+    // Calculate score based on result size and hash quality
+    // Lower hash values = better score (similar to PoW concept)
+    uint64_t hashValue = 0;
+    std::memcpy(&hashValue, resultHash.data(), sizeof(hashValue));
+    details.score = static_cast<uint32_t>(
+        std::min(static_cast<uint64_t>(1000000), 
+                 1000000ULL - (hashValue % 1000000)));
+    
+    // Check all checks passed
+    bool allPassed = true;
+    for (const auto& check : details.checks) {
+        if (!check.second) {
+            allPassed = false;
+            break;
+        }
+    }
+    
+    details.result = allPassed ? VerificationResult::VALID : VerificationResult::INVALID;
+    details.meetsRequirements = allPassed;
+    
+    auto endTime = std::chrono::steady_clock::now();
+    details.verificationTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        endTime - startTime).count();
+    
+    return details;
+}
+
+bool GenericVerifier::QuickValidate(
+    const Problem& problem,
+    const Solution& solution) {
+    
+    // Check problem type matches
+    if (problem.GetType() != type_) {
+        return false;
+    }
+    
+    // Check solution has result
+    if (solution.GetData().GetResult().empty()) {
+        return false;
+    }
+    
+    // Check problem reference matches
+    if (solution.GetProblemId() != problem.GetId()) {
+        return false;
+    }
+    
+    return true;
+}
+
+uint64_t GenericVerifier::EstimateVerificationTime(
+    const Problem& problem) const {
+    // Quick verification - mostly hash checking
+    (void)problem;
+    return 10;  // 10ms estimate
+}
+
+// ============================================================================
 // VerifierRegistry Implementation
 // ============================================================================
 
@@ -390,6 +494,14 @@ VerifierRegistry::VerifierRegistry() : impl_(std::make_unique<Impl>()) {
     Register(std::make_unique<HashPowVerifier>());
     Register(std::make_unique<MLTrainingVerifier>());
     Register(std::make_unique<LinearAlgebraVerifier>());
+    
+    // Register generic verifiers for other problem types
+    Register(std::make_unique<GenericVerifier>(ProblemType::ML_INFERENCE));
+    Register(std::make_unique<GenericVerifier>(ProblemType::SIMULATION));
+    Register(std::make_unique<GenericVerifier>(ProblemType::DATA_PROCESSING));
+    Register(std::make_unique<GenericVerifier>(ProblemType::OPTIMIZATION));
+    Register(std::make_unique<GenericVerifier>(ProblemType::CRYPTOGRAPHIC));
+    Register(std::make_unique<GenericVerifier>(ProblemType::CUSTOM));
 }
 
 VerifierRegistry::~VerifierRegistry() = default;

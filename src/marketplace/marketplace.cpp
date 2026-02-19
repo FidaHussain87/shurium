@@ -324,30 +324,34 @@ Solution::Id Marketplace::SubmitSolution(Solution solution) {
         return Solution::INVALID_ID;
     }
     
-    std::lock_guard<std::mutex> lock(impl_->solutionsMutex_);
+    Solution::Id id;
     
-    // Assign ID
-    Solution::Id id = impl_->nextSolutionId_++;
-    solution.SetId(id);
-    solution.SetSubmissionTime(GetTime());
-    solution.SetProblemHash(problem->GetHash());
-    solution.ComputeHash();
-    
-    // Store solution
-    impl_->solutionHashIndex_[solution.GetHash()] = id;
-    impl_->problemSolutions_[solution.GetProblemId()].push_back(id);
-    impl_->solutions_.emplace(id, solution);
-    impl_->totalSolutions_++;
-    
-    // Notify listeners
     {
-        std::lock_guard<std::mutex> listenerLock(impl_->listenersMutex_);
-        for (auto* listener : impl_->listeners_) {
-            listener->OnSolutionSubmitted(solution);
+        std::lock_guard<std::mutex> lock(impl_->solutionsMutex_);
+        
+        // Assign ID
+        id = impl_->nextSolutionId_++;
+        solution.SetId(id);
+        solution.SetSubmissionTime(GetTime());
+        solution.SetProblemHash(problem->GetHash());
+        solution.ComputeHash();
+        
+        // Store solution
+        impl_->solutionHashIndex_[solution.GetHash()] = id;
+        impl_->problemSolutions_[solution.GetProblemId()].push_back(id);
+        impl_->solutions_.emplace(id, solution);
+        impl_->totalSolutions_++;
+        
+        // Notify listeners
+        {
+            std::lock_guard<std::mutex> listenerLock(impl_->listenersMutex_);
+            for (auto* listener : impl_->listeners_) {
+                listener->OnSolutionSubmitted(solution);
+            }
         }
-    }
+    }  // Release solutionsMutex_ BEFORE calling TriggerVerification
     
-    // Submit for verification
+    // Submit for verification (must be outside lock to avoid deadlock)
     TriggerVerification(id);
     
     return id;
