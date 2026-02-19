@@ -8,16 +8,17 @@
 
 | Category | Commands |
 |----------|----------|
-| [Starting the Daemon](#-starting-the-daemon) | How to start, stop, and manage shuriumd |
-| [Wallet Tool](#-wallet-tool-shurium-wallet-tool) | create, import, restore, backup wallets |
+| [Starting the Daemon](#starting-the-daemon) | How to start, stop, and manage shuriumd |
+| [Wallet Tool](#wallet-tool-shurium-wallet-tool) | create, import, restore, backup wallets |
 | [Blockchain](#-blockchain-commands) | getblockchaininfo, getblock, getblockhash... |
 | [Network](#-network-commands) | getnetworkinfo, getpeerinfo, addnode... |
 | [Wallet](#-wallet-commands) | getbalance, sendtoaddress, getnewaddress... |
 | [Mining](#️-mining-commands) | getmininginfo, setgenerate, getwork... |
+| [Fund Management](#-fund-management-commands) | getfundinfo, getfundbalance, getfundaddress... |
 | [Staking](#-staking-commands) | getstakinginfo, delegate, createvalidator... |
 | [Identity/UBI](#-identityubi-commands) | createidentity, claimubi, getidentityinfo... |
 | [Governance](#️-governance-commands) | listproposals, vote, createproposal... |
-| [Utility](#-utility-commands) | help, stop, validateaddress... |
+| [Utility](#-utility-commands) | help, stop, validateaddress... ||
 
 ---
 
@@ -1507,6 +1508,164 @@ Lists governance parameters.
 ```bash
 ./shurium-cli listparameters
 ```
+
+---
+
+## 💰 Fund Management Commands
+
+SHURIUM allocates 60% of every block reward to protocol funds that support the ecosystem. These funds are secured by 2-of-3 multisig addresses.
+
+### Block Reward Distribution
+
+| Recipient | Percentage | Purpose |
+|-----------|------------|---------|
+| Miner | 40% | Reward for useful work |
+| UBI Pool | 30% | Universal Basic Income distribution |
+| Contribution Fund | 15% | Human contribution rewards |
+| Ecosystem Fund | 10% | Development and ecosystem growth |
+| Stability Reserve | 5% | Price stability mechanism |
+
+### getfundinfo
+
+Returns information about all protocol funds including addresses, governance rules, and multisig details.
+
+```bash
+./shurium-cli getfundinfo
+```
+
+**Example Output:**
+```json
+{
+  "funds": [
+    {
+      "name": "UBI Pool",
+      "percentage": 30,
+      "address": "shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb",
+      "multisig_required": 2,
+      "multisig_total": 3,
+      "requires_governance_vote": true,
+      "max_spend_without_vote": 0
+    }
+    // ... other funds
+  ],
+  "total_fund_percentage": 60,
+  "miner_percentage": 40
+}
+```
+
+---
+
+### getfundbalance
+
+Returns the balance for a specific fund.
+
+```bash
+./shurium-cli getfundbalance "FUNDTYPE"
+```
+
+| Fund Type | Description |
+|-----------|-------------|
+| `ubi` | Universal Basic Income pool |
+| `contribution` | Human contribution rewards |
+| `ecosystem` | Development and ecosystem growth |
+| `stability` | Price stability reserve |
+
+**Example:**
+```bash
+./shurium-cli getfundbalance ubi
+```
+
+**Output:**
+```json
+{
+  "fund": "UBI Pool",
+  "address": "shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb",
+  "balance": 15000.00000000,
+  "total_received": 15000.00000000,
+  "total_spent": 0.00000000
+}
+```
+
+---
+
+### listfundtransactions
+
+Lists transactions for a specific fund.
+
+```bash
+./shurium-cli listfundtransactions "FUNDTYPE" [count] [skip]
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| fundtype | Fund type (ubi, contribution, ecosystem, stability) | Required |
+| count | Number of transactions to return | 10 |
+| skip | Number of transactions to skip | 0 |
+
+**Example:**
+```bash
+./shurium-cli listfundtransactions ecosystem 20 0
+```
+
+---
+
+### getfundaddress
+
+Returns fund addresses with full multisig details including public keys and redeem script.
+
+```bash
+./shurium-cli getfundaddress [fundtype]
+```
+
+If `fundtype` is omitted, returns all fund addresses.
+
+**Example:**
+```bash
+./shurium-cli getfundaddress ubi
+```
+
+**Output:**
+```json
+[
+  {
+    "fund": "UBI Pool",
+    "type": "UBI Pool",
+    "address": "shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb",
+    "multisig": "2-of-3",
+    "pubkeys": [
+      "038092b7621df265c8da7548afcf29b5a303d974cb2654c19316aa7b336afe4f07",
+      "0290a7400f39f9bb796ddc13d156d5093060856456472b9bda128d3b5f4285cb51",
+      "0395f38c70806c1e080d5d674f6102c1ec097e825fd8ae750c94b0da5c127a3731"
+    ],
+    "redeem_script": "52210290a7400f39f9bb796ddc13d156d5093060856456472b9bda128d3b5f4285cb51..."
+  }
+]
+```
+
+---
+
+### Fund Governance
+
+Each fund has different governance requirements:
+
+| Fund | Governance Vote Required | Max Spend Without Vote |
+|------|--------------------------|------------------------|
+| UBI Pool | Yes (always) | 0 SHR |
+| Contribution Fund | No | 1,000 SHR |
+| Ecosystem Fund | No | 5,000 SHR |
+| Stability Reserve | Yes (always) | 0 SHR |
+
+### Multisig Key Holders
+
+Each fund is controlled by a 2-of-3 multisig with three key holders:
+
+| Role | Description |
+|------|-------------|
+| Governance | Elected governance council member |
+| Foundation | SHURIUM foundation key |
+| Community | Community-elected guardian |
+
+Any 2 of these 3 key holders must sign to spend from a fund.
 
 ---
 

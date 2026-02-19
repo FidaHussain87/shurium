@@ -563,6 +563,33 @@ RPCResponse cmd_estimatefee(const RPCRequest& req, const RPCContext& ctx,
                             RPCCommandTable* table);
 
 // ============================================================================
+// Fund Management Commands
+// ============================================================================
+
+/// Get information about all protocol funds
+/// Returns: array of fund info objects
+RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
+                            RPCCommandTable* table);
+
+/// Get balance for a specific fund
+/// Params: fundtype (ubi, contribution, ecosystem, stability)
+/// Returns: balance, totalReceived, totalSpent
+RPCResponse cmd_getfundbalance(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table);
+
+/// List recent transactions for a fund
+/// Params: fundtype, count (optional), skip (optional)
+/// Returns: array of transaction info
+RPCResponse cmd_listfundtransactions(const RPCRequest& req, const RPCContext& ctx,
+                                     RPCCommandTable* table);
+
+/// Get fund addresses (shows multisig details)
+/// Params: fundtype (optional, if omitted shows all)
+/// Returns: fund address details including pubkeys
+RPCResponse cmd_getfundaddress(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table);
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 

@@ -514,11 +514,10 @@ SHURIUM is built on five revolutionary innovations:
 │   BASIC INFO                                                            │
 │   ───────────                                                           │
 │   • Symbol: SHR                                                         │
-│   • Total Supply: 21,000,000,000 (21 Billion)                           │
+│   • Total Supply: ~21 Million (Bitcoin-like)                            │
 │   • Block Time: 30 seconds                                              │
-│   • Initial Block Reward: 500 SHR                                       │
-│   • Halving: Every ~4 years                                             │
-│   • Minimum Reward: 1 SHR (NEVER goes to zero!)                         │
+│   • Initial Block Reward: 50 SHR                                        │
+│   • Halving: Every ~4 years (4,207,680 blocks)                          │
 │                                                                         │
 │   BLOCK REWARD DISTRIBUTION                                             │
 │   ──────────────────────────                                            │
@@ -537,13 +536,48 @@ SHURIUM is built on five revolutionary innovations:
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│   WHO GETS WHAT (per 500 SHR block):                                    │
+│   WHO GETS WHAT (per 50 SHR block):                                     │
 │                                                                         │
-│   • Miners:        200 SHR → People solving useful problems             │
-│   • UBI Pool:      150 SHR → Shared among ALL verified humans           │
-│   • Contributors:   75 SHR → Developers, researchers, community         │
-│   • Ecosystem:      50 SHR → Grants, partnerships, growth               │
-│   • Stability:      25 SHR → Price stabilization reserve                │
+│   • Miners:        20 SHR → People solving useful problems              │
+│   • UBI Pool:      15 SHR → Shared among ALL verified humans            │
+│   • Contributors:  7.5 SHR → Developers, researchers, community         │
+│   • Ecosystem:     5 SHR → Grants, partnerships, growth                 │
+│   • Stability:     2.5 SHR → Price stabilization reserve                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Fund Security (2-of-3 Multisig)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│   FUND GOVERNANCE & SECURITY                                            │
+│                                                                         │
+│   All 60% of block rewards going to protocol funds are secured by       │
+│   2-of-3 MULTISIG addresses. This means:                                │
+│                                                                         │
+│   • 3 key holders for each fund (Governance, Foundation, Community)     │
+│   • Any 2 of 3 must sign to spend                                       │
+│   • No single party can steal or misuse funds                           │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  FUND              │  GOVERNANCE VOTE   │  SPEND LIMIT          │   │
+│   │                    │  REQUIRED?         │  WITHOUT VOTE         │   │
+│   ├────────────────────┼────────────────────┼───────────────────────│   │
+│   │  UBI Pool (30%)    │  YES (always)      │  0 SHR                │   │
+│   │  Contribution (15%)│  No                │  1,000 SHR            │   │
+│   │  Ecosystem (10%)   │  No                │  5,000 SHR            │   │
+│   │  Stability (5%)    │  YES (always)      │  0 SHR                │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│   KEY HOLDERS:                                                          │
+│   ────────────                                                          │
+│   🏛️  GOVERNANCE  → Elected governance council member                   │
+│   🏢 FOUNDATION  → SHURIUM foundation representative                    │
+│   👥 COMMUNITY   → Community-elected guardian                           │
+│                                                                         │
+│   View fund addresses: ./shurium-cli getfundinfo                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -553,27 +587,24 @@ SHURIUM is built on five revolutionary innovations:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│   SUPPLY OVER TIME                                                      │
+│   SUPPLY OVER TIME (Bitcoin-aligned 4-year halving)                     │
 │                                                                         │
 │   Year    │ Block Reward │ Annual New Supply │ Total Supply             │
 │   ────────┼──────────────┼───────────────────┼──────────────────        │
-│   Year 1  │   500 SHR    │  525,600,000 SHR  │    525,600,000           │
-│   Year 2  │   500 SHR    │  525,600,000 SHR  │  1,051,200,000           │
-│   Year 3  │   500 SHR    │  525,600,000 SHR  │  1,576,800,000           │
-│   Year 4  │   500 SHR    │  525,600,000 SHR  │  2,102,400,000           │
-│   Year 5  │   250 SHR    │  262,800,000 SHR  │  2,365,200,000 (halving) │
+│   Year 1  │   50 SHR     │  52,560,000 SHR   │     52,560,000           │
+│   Year 2  │   50 SHR     │  52,560,000 SHR   │    105,120,000           │
+│   Year 3  │   50 SHR     │  52,560,000 SHR   │    157,680,000           │
+│   Year 4  │   50 SHR     │  52,560,000 SHR   │    210,240,000           │
+│   Year 5  │   25 SHR     │  26,280,000 SHR   │    236,520,000 (halving) │
 │   ...     │   ...        │     ...           │      ...                 │
-│   Year 20+│   ~1 SHR     │   ~1,051,200 SHR  │ ~21,000,000,000          │
+│   Year 40+│   ~0 SHR     │   negligible      │  ~21,000,000             │
 │                                                                         │
-│   KEY DIFFERENCE FROM BITCOIN:                                          │
-│   ─────────────────────────────                                         │
-│   Bitcoin:  Reward goes to ZERO (year ~2140)                            │
-│   SHURIUM:    Minimum 1 SHR/block FOREVER (perpetual UBI!)              │
-│                                                                         │
-│   This means:                                                           │
-│   • Network security is always funded                                   │
-│   • UBI continues indefinitely                                          │
-│   • No "death spiral" when rewards run out                              │
+│   COMPARISON TO BITCOIN:                                                │
+│   ──────────────────────                                                │
+│   • Same halving schedule (~4 years)                                    │
+│   • Same total supply (~21 million)                                     │
+│   • Faster blocks (30s vs 10min) for quicker confirmations              │
+│   • 60% goes to society (UBI, ecosystem) vs 100% to miners              │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

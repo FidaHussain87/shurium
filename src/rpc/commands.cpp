@@ -17,6 +17,7 @@
 #include <shurium/network/network_manager.h>
 #include <shurium/identity/identity.h>
 #include <shurium/economics/ubi.h>
+#include <shurium/economics/funds.h>
 #include <shurium/staking/staking.h>
 #include <shurium/governance/governance.h>
 #include <shurium/marketplace/marketplace.h>
@@ -1532,6 +1533,58 @@ void RPCCommandTable::RegisterUtilityCommands() {
         false, false,
         {"nblocks"},
         {"Target confirmation blocks"}
+    });
+    
+    // ========================================================================
+    // Fund Management Commands
+    // ========================================================================
+    
+    commands_.push_back({
+        "getfundinfo",
+        Category::BLOCKCHAIN,
+        "Get information about all protocol funds (UBI, Ecosystem, etc.).",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_getfundinfo(req, ctx, table);
+        },
+        false, false,
+        {},
+        {}
+    });
+    
+    commands_.push_back({
+        "getfundbalance",
+        Category::BLOCKCHAIN,
+        "Get balance for a specific fund.",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_getfundbalance(req, ctx, table);
+        },
+        false, false,
+        {"fundtype"},
+        {"Fund type (ubi, contribution, ecosystem, stability)"}
+    });
+    
+    commands_.push_back({
+        "listfundtransactions",
+        Category::BLOCKCHAIN,
+        "List transactions for a specific fund.",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_listfundtransactions(req, ctx, table);
+        },
+        false, false,
+        {"fundtype", "count", "skip"},
+        {"Fund type", "Number of transactions", "Skip count"}
+    });
+    
+    commands_.push_back({
+        "getfundaddress",
+        Category::BLOCKCHAIN,
+        "Get fund addresses with multisig details.",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_getfundaddress(req, ctx, table);
+        },
+        false, false,
+        {"fundtype"},
+        {"Fund type (optional, if omitted shows all)"}
     });
 }
 
@@ -6927,6 +6980,222 @@ RPCResponse cmd_estimatefee(const RPCRequest& req, const RPCContext& ctx,
     }
     
     return RPCResponse::Success(JSONValue(feeRate), req.GetId());
+}
+
+// ============================================================================
+// Fund Management Commands
+// ============================================================================
+
+RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
+                            RPCCommandTable* table) {
+    (void)ctx;
+    (void)table;
+    
+    // Import fund manager
+    using namespace economics;
+    
+    // Initialize fund manager if not already done
+    static bool initialized = false;
+    if (!initialized) {
+        InitializeFundManager("regtest");  // TODO: Get network from context
+        initialized = true;
+    }
+    
+    JSONValue::Array funds;
+    
+    const auto& allFunds = GetFundManager().GetAllFunds();
+    for (const auto& config : allFunds) {
+        JSONValue::Object fund;
+        fund["name"] = config.name;
+        fund["description"] = config.description;
+        fund["percentage"] = config.percentageBasisPoints / 100.0;
+        fund["address"] = config.GetAddress("shr");
+        fund["requires_governance_vote"] = config.requiresGovernanceVote;
+        fund["max_spend_without_vote"] = static_cast<double>(config.maxSpendWithoutVote) / COIN;
+        
+        // Add multisig details
+        fund["multisig_required"] = static_cast<int64_t>(FUND_MULTISIG_REQUIRED);
+        fund["multisig_total"] = static_cast<int64_t>(FUND_MULTISIG_TOTAL);
+        
+        // Add key info
+        JSONValue::Array keys;
+        for (const auto& keyInfo : config.keys) {
+            JSONValue::Object key;
+            key["pubkey"] = keyInfo.pubkey.ToHex();
+            key["description"] = keyInfo.description;
+            key["role"] = static_cast<int64_t>(keyInfo.role);
+            keys.push_back(key);
+        }
+        fund["keys"] = keys;
+        
+        funds.push_back(fund);
+    }
+    
+    // Add summary
+    JSONValue::Object result;
+    result["funds"] = funds;
+    result["total_fund_percentage"] = GetFundManager().GetTotalFundPercentage();
+    result["miner_percentage"] = 40;  // Miner gets 40%
+    
+    return RPCResponse::Success(result, req.GetId());
+}
+
+RPCResponse cmd_getfundbalance(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table) {
+    (void)ctx;
+    (void)table;
+    
+    using namespace economics;
+    
+    // Get fund type from params
+    std::string fundTypeStr = GetRequiredParam<std::string>(req, size_t(0));
+    
+    // Parse fund type
+    FundType type;
+    if (fundTypeStr == "ubi" || fundTypeStr == "UBI") {
+        type = FundType::UBI;
+    } else if (fundTypeStr == "contribution" || fundTypeStr == "contributions") {
+        type = FundType::Contribution;
+    } else if (fundTypeStr == "ecosystem" || fundTypeStr == "eco") {
+        type = FundType::Ecosystem;
+    } else if (fundTypeStr == "stability" || fundTypeStr == "reserve") {
+        type = FundType::Stability;
+    } else {
+        return InvalidParams("Invalid fund type. Use: ubi, contribution, ecosystem, stability", req.GetId());
+    }
+    
+    // Initialize fund manager if needed
+    static bool initialized = false;
+    if (!initialized) {
+        InitializeFundManager("regtest");
+        initialized = true;
+    }
+    
+    const auto& config = GetFundManager().GetFundConfig(type);
+    
+    JSONValue::Object result;
+    result["fund"] = config.name;
+    result["address"] = config.GetAddress("shr");
+    result["balance"] = static_cast<double>(GetFundManager().GetFundBalance(type)) / COIN;
+    result["total_received"] = static_cast<double>(GetFundManager().GetTotalReceived(type)) / COIN;
+    result["total_spent"] = static_cast<double>(GetFundManager().GetTotalSpent(type)) / COIN;
+    
+    // Note: Full balance tracking requires UTXO database integration
+    result["note"] = "Balance tracking requires full node sync. Values shown may be estimates.";
+    
+    return RPCResponse::Success(result, req.GetId());
+}
+
+RPCResponse cmd_listfundtransactions(const RPCRequest& req, const RPCContext& ctx,
+                                     RPCCommandTable* table) {
+    (void)ctx;
+    (void)table;
+    
+    using namespace economics;
+    
+    // Get fund type from params
+    std::string fundTypeStr = GetRequiredParam<std::string>(req, size_t(0));
+    int64_t count = GetOptionalParam<int64_t>(req, size_t(1), int64_t(10));
+    int64_t skip = GetOptionalParam<int64_t>(req, size_t(2), int64_t(0));
+    
+    // Parse fund type
+    FundType type;
+    if (fundTypeStr == "ubi" || fundTypeStr == "UBI") {
+        type = FundType::UBI;
+    } else if (fundTypeStr == "contribution" || fundTypeStr == "contributions") {
+        type = FundType::Contribution;
+    } else if (fundTypeStr == "ecosystem" || fundTypeStr == "eco") {
+        type = FundType::Ecosystem;
+    } else if (fundTypeStr == "stability" || fundTypeStr == "reserve") {
+        type = FundType::Stability;
+    } else {
+        return InvalidParams("Invalid fund type. Use: ubi, contribution, ecosystem, stability", req.GetId());
+    }
+    
+    // Initialize fund manager if needed
+    static bool initialized = false;
+    if (!initialized) {
+        InitializeFundManager("regtest");
+        initialized = true;
+    }
+    
+    const auto& config = GetFundManager().GetFundConfig(type);
+    
+    // TODO: Implement actual transaction listing from blockchain
+    // For now, return placeholder
+    JSONValue::Object result;
+    result["fund"] = config.name;
+    result["address"] = config.GetAddress("shr");
+    result["count"] = count;
+    result["skip"] = skip;
+    result["transactions"] = JSONValue::Array();
+    result["note"] = "Transaction listing requires full blockchain scan. Feature in development.";
+    
+    return RPCResponse::Success(result, req.GetId());
+}
+
+RPCResponse cmd_getfundaddress(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table) {
+    (void)ctx;
+    (void)table;
+    
+    using namespace economics;
+    
+    // Initialize fund manager if needed
+    static bool initialized = false;
+    if (!initialized) {
+        InitializeFundManager("regtest");
+        initialized = true;
+    }
+    
+    // Optional fund type filter
+    std::string fundTypeStr = GetOptionalParam<std::string>(req, size_t(0), std::string(""));
+    
+    JSONValue::Array addresses;
+    
+    const auto& allFunds = GetFundManager().GetAllFunds();
+    for (const auto& config : allFunds) {
+        // Filter if type specified
+        if (!fundTypeStr.empty()) {
+            bool match = false;
+            if ((fundTypeStr == "ubi" || fundTypeStr == "UBI") && config.type == FundType::UBI) match = true;
+            else if ((fundTypeStr == "contribution" || fundTypeStr == "contributions") && config.type == FundType::Contribution) match = true;
+            else if ((fundTypeStr == "ecosystem" || fundTypeStr == "eco") && config.type == FundType::Ecosystem) match = true;
+            else if ((fundTypeStr == "stability" || fundTypeStr == "reserve") && config.type == FundType::Stability) match = true;
+            
+            if (!match) continue;
+        }
+        
+        JSONValue::Object addr;
+        addr["fund"] = config.name;
+        addr["type"] = FundTypeToString(config.type);
+        addr["address"] = config.GetAddress("shr");
+        addr["script_hash"] = config.scriptHash.ToHex();
+        addr["percentage"] = config.percentageBasisPoints / 100.0;
+        
+        // Add multisig details
+        addr["multisig"] = std::to_string(FUND_MULTISIG_REQUIRED) + "-of-" + std::to_string(FUND_MULTISIG_TOTAL);
+        
+        // Add public keys
+        JSONValue::Array pubkeys;
+        for (const auto& keyInfo : config.keys) {
+            pubkeys.push_back(keyInfo.pubkey.ToHex());
+        }
+        addr["pubkeys"] = pubkeys;
+        
+        // Add redeem script (hex)
+        std::string redeemScriptHex;
+        for (uint8_t byte : config.redeemScript) {
+            char hex[3];
+            snprintf(hex, sizeof(hex), "%02x", byte);
+            redeemScriptHex += hex;
+        }
+        addr["redeem_script"] = redeemScriptHex;
+        
+        addresses.push_back(addr);
+    }
+    
+    return RPCResponse::Success(addresses, req.GetId());
 }
 
 } // namespace rpc

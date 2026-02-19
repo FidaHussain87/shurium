@@ -51,23 +51,27 @@
 │   ─────────────                                                         │
 │                                                                         │
 │   Blocks per day:     2,880 (one every 30 seconds)                      │
-│   Coins per block:    500 SHR (early years)                             │
-│   Total daily coins:  1,440,000 SHR                                     │
-│   UBI share (30%):    432,000 SHR                                       │
+│   Coins per block:    50 SHR (initial reward)                           │
+│   Total daily coins:  144,000 SHR                                       │
+│   UBI share (30%):    43,200 SHR                                        │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │   YOUR DAILY UBI = 432,000 ÷ (number of verified users)         │   │
+│   │   YOUR DAILY UBI = 43,200 ÷ (number of verified users)          │   │
 │   │                                                                 │   │
-│   │   If 10,000 users:     43.2 SHR/day/person                      │   │
-│   │   If 100,000 users:    4.32 SHR/day/person                      │   │
-│   │   If 1,000,000 users:  0.432 SHR/day/person                     │   │
+│   │   If 10,000 users:     4.32 SHR/day/person                      │   │
+│   │   If 100,000 users:    0.432 SHR/day/person                     │   │
+│   │   If 1,000,000 users:  0.0432 SHR/day/person                    │   │
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │   KEY INSIGHT:                                                          │
 │   More users = smaller individual share, BUT also more adoption,        │
 │   which typically increases token value. It balances out!               │
+│                                                                         │
+│   UBI POOL SECURITY:                                                    │
+│   The UBI Pool is secured by a 2-of-3 multisig address.                 │
+│   View details: ./shurium-cli getfundaddress ubi                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

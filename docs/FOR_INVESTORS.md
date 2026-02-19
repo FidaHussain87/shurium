@@ -20,13 +20,15 @@
 │                    SHURIUM AT A GLANCE                                  │
 │                                                                         │
 │   Symbol:          SHR                                                  │
-│   Total Supply:    21,000,000,000 (21 Billion)                          │
+│   Total Supply:    ~21 Million (Bitcoin-like tokenomics)                │
 │   Block Time:      30 seconds                                           │
+│   Halving:         Every ~4 years (4,207,680 blocks)                    │
 │   Consensus:       Proof of Useful Work + Delegated PoS                 │
 │                                                                         │
 │   UNIQUE VALUE PROPOSITIONS:                                            │
 │   ✓ Mining energy creates REAL value (not wasted)                       │
 │   ✓ 30% of all coins distributed as Universal Basic Income              │
+│   ✓ 60% of rewards secured by 2-of-3 multisig governance                │
 │   ✓ Built-in price stability mechanisms                                 │
 │   ✓ Democratic on-chain governance                                      │
 │   ✓ Privacy-preserving identity (ZK proofs)                             │
@@ -125,13 +127,13 @@
 │                                                                         │
 │                    TOKENOMICS ANALYSIS                                  │
 │                                                                         │
-│   SUPPLY SCHEDULE                                                       │
-│   ───────────────                                                       │
+│   SUPPLY SCHEDULE (Bitcoin-aligned)                                     │
+│   ─────────────────────────────────                                     │
 │                                                                         │
-│   Total Supply:     21,000,000,000 SHR                                  │
-│   Initial Reward:   500 SHR per block                                   │
+│   Total Supply:     ~21,000,000 SHR (same as Bitcoin)                   │
+│   Initial Reward:   50 SHR per block (same as Bitcoin)                  │
 │   Blocks per Year:  ~1,051,200 (30-second blocks)                       │
-│   Halving:          Every 4,204,800 blocks (~4 years)                   │
+│   Halving:          Every 4,207,680 blocks (~4 years)                   │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
@@ -139,33 +141,31 @@
 │   │                                                                 │   │
 │   │   Year  │ Block Reward │ Annual Emission │ Cumulative Supply    │   │
 │   │   ──────┼──────────────┼─────────────────┼───────────────────   │   │
-│   │   1     │  500 SHR     │   525.6M SHR    │     525.6M           │   │
-│   │   2     │  500 SHR     │   525.6M SHR    │   1,051.2M           │   │
-│   │   3     │  500 SHR     │   525.6M SHR    │   1,576.8M           │   │
-│   │   4     │  500 SHR     │   525.6M SHR    │   2,102.4M           │   │
-│   │   5     │  250 SHR     │   262.8M SHR    │   2,365.2M           │   │
-│   │   6     │  250 SHR     │   262.8M SHR    │   2,628.0M           │   │
+│   │   1     │  50 SHR      │   52.56M SHR    │     52.56M           │   │
+│   │   2     │  50 SHR      │   52.56M SHR    │    105.12M           │   │
+│   │   3     │  50 SHR      │   52.56M SHR    │    157.68M           │   │
+│   │   4     │  50 SHR      │   52.56M SHR    │    210.24M           │   │
+│   │   5     │  25 SHR      │   26.28M SHR    │    236.52M           │   │
+│   │   6     │  25 SHR      │   26.28M SHR    │    262.80M           │   │
 │   │   ...   │  ...         │   ...           │   ...                │   │
-│   │   20+   │  ~1 SHR      │   ~1.05M SHR    │   ~21B (cap)         │   │
+│   │   40+   │  ~0 SHR      │   negligible    │   ~21M (cap)         │   │
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│   KEY INSIGHT: Block rewards NEVER go to zero!                          │
-│   Minimum 1 SHR/block ensures perpetual UBI and network security.       │
-│                                                                         │
-│   DISTRIBUTION (per block)                                              │
-│   ────────────────────────                                              │
+│   DISTRIBUTION (per 50 SHR block)                                       │
+│   ───────────────────────────────                                       │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │   ████████████████████████████████████████  40%  MINERS         │   │
-│   │   ██████████████████████████████           30%  UBI POOL        │   │
-│   │   ██████████████████                       15%  CONTRIBUTORS    │   │
-│   │   ████████████                             10%  ECOSYSTEM       │   │
-│   │   ██████                                    5%  STABILITY       │   │
+│   │   ████████████████████████████████████████  40%  MINERS (20 SHR)│   │
+│   │   ██████████████████████████████           30%  UBI POOL (15)   │   │
+│   │   ██████████████████                       15%  CONTRIB (7.5)   │   │
+│   │   ████████████                             10%  ECOSYSTEM (5)   │   │
+│   │   ██████                                    5%  STABILITY (2.5) │   │
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
+│   FUND SECURITY: All 60% non-miner rewards secured by 2-of-3 multisig   │
 │   Compare to Bitcoin: 100% to miners, nothing for ecosystem/users.      │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘

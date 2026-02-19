@@ -220,8 +220,9 @@ add_library(shurium_economics STATIC
     src/economics/stability.cpp
     src/economics/oracle.cpp
     src/economics/treasury.cpp
+    src/economics/funds.cpp
 )
-target_link_libraries(shurium_economics PUBLIC shurium_consensus shurium_identity)
+target_link_libraries(shurium_economics PUBLIC shurium_consensus shurium_identity shurium_crypto)
 
 # Governance module - On-chain governance
 add_library(shurium_governance STATIC

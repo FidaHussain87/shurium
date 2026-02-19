@@ -7,6 +7,7 @@
 #include "shurium/core/block.h"
 #include "shurium/util/logging.h"
 #include "shurium/db/database.h"
+#include "shurium/economics/funds.h"
 
 #include <sys/stat.h>
 
@@ -118,6 +119,17 @@ bool InitializeNode(NodeContext& node, const NodeInitOptions& options) {
     node.params = GetConsensusParams(options.network);
     LOG_INFO(util::LogCategory::DEFAULT) << "Network: " << options.network 
                                          << " (genesis: " << node.params->hashGenesisBlock.ToHex().substr(0, 16) << "...)";
+    
+    // ========================================================================
+    // Step 2b: Initialize fund manager
+    // ========================================================================
+    
+    if (!economics::InitializeFundManager(options.network)) {
+        LOG_WARN(util::LogCategory::DEFAULT) << "Failed to initialize fund manager";
+        // Non-fatal - continue without fund manager
+    } else {
+        LOG_INFO(util::LogCategory::DEFAULT) << "Fund manager initialized for " << options.network;
+    }
     
     // ========================================================================
     // Step 3: Open databases

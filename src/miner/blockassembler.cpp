@@ -7,6 +7,7 @@
 #include "shurium/chain/blockindex.h"
 #include "shurium/core/serialize.h"
 #include "shurium/script/interpreter.h"
+#include "shurium/economics/funds.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -191,27 +192,35 @@ TransactionRef BlockAssembler::CreateCoinbase(const Script& coinbaseScript) {
     // Output 1: Miner reward (40%)
     coinbase.vout.push_back(TxOut(minerReward, coinbaseScript));
     
-    // Output 2: UBI Pool (30%)
+    // Get fund manager for proper P2SH addresses
+    // Fund manager generates 2-of-3 multisig addresses for each fund
+    auto& fundMgr = economics::GetFundManager();
+    
+    // Output 2: UBI Pool (30%) - P2SH to multisig address
     if (ubiReward > 0) {
-        Script ubiScript = Script::CreateP2PKH(m_params.ubiPoolAddress);
+        Hash160 ubiHash = fundMgr.GetFundAddress(economics::FundType::UBI);
+        Script ubiScript = Script::CreateP2SH(ubiHash);
         coinbase.vout.push_back(TxOut(ubiReward, ubiScript));
     }
     
-    // Output 3: Contribution rewards (15%)
+    // Output 3: Contribution rewards (15%) - P2SH to multisig address
     if (contributionReward > 0) {
-        Script contribScript = Script::CreateP2PKH(m_params.contributionAddress);
+        Hash160 contribHash = fundMgr.GetFundAddress(economics::FundType::Contribution);
+        Script contribScript = Script::CreateP2SH(contribHash);
         coinbase.vout.push_back(TxOut(contributionReward, contribScript));
     }
     
-    // Output 4: Ecosystem development (10%)
+    // Output 4: Ecosystem development (10%) - P2SH to multisig address
     if (ecosystemReward > 0) {
-        Script ecoScript = Script::CreateP2PKH(m_params.ecosystemAddress);
+        Hash160 ecoHash = fundMgr.GetFundAddress(economics::FundType::Ecosystem);
+        Script ecoScript = Script::CreateP2SH(ecoHash);
         coinbase.vout.push_back(TxOut(ecosystemReward, ecoScript));
     }
     
-    // Output 5: Stability reserve (5%)
+    // Output 5: Stability reserve (5%) - P2SH to multisig address
     if (stabilityReward > 0) {
-        Script stabilityScript = Script::CreateP2PKH(m_params.stabilityAddress);
+        Hash160 stabilityHash = fundMgr.GetFundAddress(economics::FundType::Stability);
+        Script stabilityScript = Script::CreateP2SH(stabilityHash);
         coinbase.vout.push_back(TxOut(stabilityReward, stabilityScript));
     }
     

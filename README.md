@@ -404,27 +404,43 @@ Before you start, understand these **critical** rules:
 | Property | Value |
 |----------|-------|
 | **Coin Symbol** | SHR |
-| **Total Supply** | 21,000,000,000 (21 Billion) |
+| **Total Supply** | ~21 Million (Bitcoin-like) |
 | **Block Time** | 30 seconds |
-| **Initial Block Reward** | 100 SHR |
+| **Initial Block Reward** | 50 SHR |
+| **Halving Interval** | ~4 years (4,207,680 blocks) |
 | **Consensus** | Proof of Useful Work + Delegated PoS |
-| **UBI Share** | 30% of block rewards |
-| **Miner Share** | 40% of block rewards |
 
 ### Block Reward Distribution
 
+Every block reward is automatically split among 5 recipients:
+
 ```
-                    BLOCK REWARD: 100 SHR
+                    BLOCK REWARD: 50 SHR
     ┌─────────────────────────────────────────────────┐
     │                                                 │
-    │  ████████████████░░░░░░░░░░░░░░  40% Miners     │
-    │  ████████████░░░░░░░░░░░░░░░░░░  30% UBI Pool   │
-    │  ██████░░░░░░░░░░░░░░░░░░░░░░░░  15% Contrib.   │
-    │  ████░░░░░░░░░░░░░░░░░░░░░░░░░░  10% Ecosystem  │
-    │  ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░   5% Stability  │
+    │  ████████████████░░░░░░░░░░░░░░  40% Miners     │  20 SHR
+    │  ████████████░░░░░░░░░░░░░░░░░░  30% UBI Pool   │  15 SHR
+    │  ██████░░░░░░░░░░░░░░░░░░░░░░░░  15% Contrib.   │  7.5 SHR
+    │  ████░░░░░░░░░░░░░░░░░░░░░░░░░░  10% Ecosystem  │  5 SHR
+    │  ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░   5% Stability  │  2.5 SHR
     │                                                 │
     └─────────────────────────────────────────────────┘
 ```
+
+### Fund Security
+
+The 60% allocated to protocol funds is secured by **2-of-3 multisig** addresses:
+
+| Fund | % | Governance Required | Purpose |
+|------|---|---------------------|---------|
+| **UBI Pool** | 30% | Yes (always) | Universal Basic Income for verified humans |
+| **Contribution Fund** | 15% | No (up to 1,000 SHR) | Rewards for human contributions |
+| **Ecosystem Fund** | 10% | No (up to 5,000 SHR) | Development and ecosystem growth |
+| **Stability Reserve** | 5% | Yes (always) | Price stability mechanism |
+
+Each fund is controlled by 3 key holders (Governance, Foundation, Community) - any 2 must sign to spend.
+
+View fund details: `./shurium-cli getfundinfo`
 
 ---
 

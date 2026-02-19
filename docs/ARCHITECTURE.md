@@ -1071,7 +1071,7 @@ Think of SHURIUM like a **well-organized company** with different departments, e
 | **CORE** | Basic building blocks (blocks, transactions, hashes) |
 | **CHAIN** | Tracks who owns what coins |
 | **CONSENSUS** | The rules everyone follows + checkpoints for security |
-| **ECONOMICS** | Rewards, UBI, oracles, and price stability |
+| **ECONOMICS** | Rewards, UBI, oracles, price stability, and **fund management** |
 | **IDENTITY** | Privacy-preserving proof of humanity |
 | **MARKETPLACE** | Where useful work gets done |
 | **STAKING** | Lock coins to secure network |
@@ -1079,13 +1079,28 @@ Think of SHURIUM like a **well-organized company** with different departments, e
 | **CRYPTO** | Encryption and signatures |
 | **WALLET** | Manages your keys and money |
 | **MEMPOOL** | Pending transaction queue |
-| **MINER** | Creates new blocks |
+| **MINER** | Creates new blocks with 5-way reward distribution |
 | **NETWORK** | Peer-to-peer communication + DNS seeding |
 | **DB** | Stores everything permanently |
-| **RPC** | External API access |
+| **RPC** | External API access (including fund management commands) |
 | **SCRIPT** | Transaction logic |
 | **NODE** | Orchestrates everything |
 | **UTIL** | Helper functions + config parsing |
+
+### Fund Management (Economics Module)
+
+The economics module includes a **Fund Manager** that handles the 60% of block rewards going to protocol funds:
+
+| Fund | % | Security | Purpose |
+|------|---|----------|---------|
+| UBI Pool | 30% | 2-of-3 multisig | Universal Basic Income |
+| Contribution | 15% | 2-of-3 multisig | Human contribution rewards |
+| Ecosystem | 10% | 2-of-3 multisig | Development & growth |
+| Stability | 5% | 2-of-3 multisig | Price stability reserve |
+
+Key files: `include/shurium/economics/funds.h`, `src/economics/funds.cpp`
+
+RPC commands: `getfundinfo`, `getfundbalance`, `getfundaddress`, `listfundtransactions`
 
 ---
 
