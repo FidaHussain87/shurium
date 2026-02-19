@@ -813,6 +813,7 @@ bool StartRPCServer(const DaemonConfig& config) {
     
     // Create and register commands
     g_rpcCommands = std::make_unique<rpc::RPCCommandTable>();
+    g_rpcCommands->SetDataDir(config.dataDir);  // Set data directory for wallet paths
     g_rpcCommands->RegisterCommands(*g_rpcServer);
     
     // Start server

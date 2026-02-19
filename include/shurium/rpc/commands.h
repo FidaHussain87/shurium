@@ -102,6 +102,9 @@ public:
     /// Set block database reference (for raw block data)
     void SetBlockDB(std::shared_ptr<db::BlockDB> blockdb);
     
+    /// Set data directory path (for wallet file paths)
+    void SetDataDir(const std::string& dataDir);
+    
     // === Command Registration ===
     
     /// Register all commands with the server
@@ -126,6 +129,7 @@ public:
     network::NetworkManager* GetNetworkManager() const { return network_.get(); }
     MessageProcessor* GetMessageProcessor() const { return msgproc_; }
     db::BlockDB* GetBlockDB() const { return blockdb_.get(); }
+    const std::string& GetDataDir() const { return dataDir_; }
 
 private:
     // === Command Registration Helpers ===
@@ -153,6 +157,7 @@ private:
     std::shared_ptr<network::NetworkManager> network_;
     std::shared_ptr<db::BlockDB> blockdb_;
     MessageProcessor* msgproc_{nullptr};  // Not owned - raw pointer for optional ref
+    std::string dataDir_;  // Data directory for wallet file paths
 };
 
 // ============================================================================
@@ -342,6 +347,10 @@ RPCResponse cmd_createwallet(const RPCRequest& req, const RPCContext& ctx,
 /// Unload current wallet
 RPCResponse cmd_unloadwallet(const RPCRequest& req, const RPCContext& ctx,
                              RPCCommandTable* table);
+
+/// Restore wallet from mnemonic phrase
+RPCResponse cmd_restorewallet(const RPCRequest& req, const RPCContext& ctx,
+                              RPCCommandTable* table);
 
 // ============================================================================
 // Identity Commands

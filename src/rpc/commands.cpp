@@ -45,6 +45,18 @@ namespace rpc {
 
 static std::chrono::steady_clock::time_point g_startTime = std::chrono::steady_clock::now();
 
+// Helper to join directory path with filename
+static std::string JoinWalletPath(const std::string& dir, const std::string& filename) {
+    if (dir.empty()) {
+        return filename;
+    }
+#ifdef _WIN32
+    return dir + "\\" + filename;
+#else
+    return dir + "/" + filename;
+#endif
+}
+
 // ============================================================================
 // Helper Functions Implementation
 // ============================================================================
@@ -316,6 +328,10 @@ void RPCCommandTable::SetMessageProcessor(MessageProcessor* msgproc) {
 
 void RPCCommandTable::SetBlockDB(std::shared_ptr<db::BlockDB> blockdb) {
     blockdb_ = std::move(blockdb);
+}
+
+void RPCCommandTable::SetDataDir(const std::string& dataDir) {
+    dataDir_ = dataDir;
 }
 
 void RPCCommandTable::RegisterCommands(RPCServer& server) {
@@ -899,6 +915,22 @@ void RPCCommandTable::RegisterWalletCommands() {
         },
         false, false,
         {},
+        {}
+    });
+    
+    commands_.push_back({
+        "restorewallet",
+        Category::WALLET,
+        "Restores a wallet from a 24-word mnemonic phrase.\n"
+        "Arguments:\n"
+        "1. wallet_name  (string, required) Name for the wallet\n"
+        "2. mnemonic     (string, required) 24-word recovery phrase\n"
+        "3. passphrase   (string, optional) BIP39 passphrase (default: empty)",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_restorewallet(req, ctx, table);
+        },
+        false, false,
+        {"wallet_name", "mnemonic", "passphrase"},
         {}
     });
 }
@@ -3458,13 +3490,23 @@ RPCResponse cmd_loadwallet(const RPCRequest& req, const RPCContext& ctx,
             return RPCResponse::Error(-4, "Wallet already loaded. Use unloadwallet first.", req.GetId());
         }
         
-        // Get data directory from context or use default path
+        // Construct wallet path using data directory if filename doesn't contain path separator
         std::string walletPath = filename;
+        bool hasPathSeparator = (filename.find('/') != std::string::npos || 
+                                 filename.find('\\') != std::string::npos);
+        if (!hasPathSeparator && !table->GetDataDir().empty()) {
+            // Add .dat extension if not present
+            std::string walletFile = filename;
+            if (walletFile.find(".dat") == std::string::npos) {
+                walletFile += ".dat";
+            }
+            walletPath = JoinWalletPath(table->GetDataDir(), walletFile);
+        }
         
         // Try to load wallet
         auto wallet = wallet::Wallet::Load(walletPath);
         if (!wallet) {
-            return RPCResponse::Error(-4, "Unable to load wallet file: " + filename, req.GetId());
+            return RPCResponse::Error(-4, "Unable to load wallet file: " + walletPath, req.GetId());
         }
         
         // Set wallet in command table
@@ -3472,6 +3514,7 @@ RPCResponse cmd_loadwallet(const RPCRequest& req, const RPCContext& ctx,
         
         JSONValue result;
         result["name"] = filename;
+        result["path"] = walletPath;
         result["warning"] = "";
         
         return RPCResponse::Success(result, req.GetId());
@@ -3503,8 +3546,14 @@ RPCResponse cmd_createwallet(const RPCRequest& req, const RPCContext& ctx,
             return RPCResponse::Error(-4, "Failed to create wallet", req.GetId());
         }
         
+        // Construct wallet path using data directory
+        std::string walletFile = walletName + ".dat";
+        std::string walletPath = walletFile;
+        if (!table->GetDataDir().empty()) {
+            walletPath = JoinWalletPath(table->GetDataDir(), walletFile);
+        }
+        
         // Save wallet
-        std::string walletPath = walletName + ".dat";
         if (!wallet->Save(walletPath)) {
             return RPCResponse::Error(-4, "Failed to save wallet to: " + walletPath, req.GetId());
         }
@@ -3514,6 +3563,7 @@ RPCResponse cmd_createwallet(const RPCRequest& req, const RPCContext& ctx,
         
         JSONValue::Object result;
         result["name"] = walletName;
+        result["path"] = walletPath;
         result["mnemonic"] = mnemonic;
         result["warning"] = "IMPORTANT: Write down these 24 words and store them securely! "
                            "This is the ONLY way to recover your wallet. "
@@ -3547,6 +3597,73 @@ RPCResponse cmd_unloadwallet(const RPCRequest& req, const RPCContext& ctx,
         return RPCResponse::Success(result, req.GetId());
     } catch (const std::exception& e) {
         return RPCResponse::Error(-4, std::string("Error unloading wallet: ") + e.what(), req.GetId());
+    }
+}
+
+RPCResponse cmd_restorewallet(const RPCRequest& req, const RPCContext& ctx,
+                              RPCCommandTable* table) {
+    try {
+        std::string walletName = GetRequiredParam<std::string>(req, size_t(0));
+        std::string mnemonic = GetRequiredParam<std::string>(req, size_t(1));
+        std::string passphrase = GetOptionalParam<std::string>(req, size_t(2), "");
+        
+        // Check if wallet already loaded
+        if (table->GetWallet()) {
+            return RPCResponse::Error(-4, "Wallet already loaded. Use unloadwallet first.", req.GetId());
+        }
+        
+        // Validate mnemonic (should be 24 words)
+        int wordCount = 0;
+        bool inWord = false;
+        for (char c : mnemonic) {
+            if (std::isspace(c)) {
+                inWord = false;
+            } else if (!inWord) {
+                inWord = true;
+                ++wordCount;
+            }
+        }
+        if (wordCount != 24) {
+            return RPCResponse::Error(-4, "Invalid mnemonic: expected 24 words, got " + 
+                                      std::to_string(wordCount), req.GetId());
+        }
+        
+        // Create wallet config
+        wallet::Wallet::Config config;
+        config.name = walletName;
+        
+        // Restore wallet from mnemonic
+        auto wallet = wallet::Wallet::FromMnemonic(mnemonic, passphrase, "", config);
+        if (!wallet) {
+            return RPCResponse::Error(-4, "Failed to restore wallet from mnemonic. "
+                                      "Please check that the recovery phrase is correct.", req.GetId());
+        }
+        
+        // Construct wallet path using data directory
+        std::string walletFile = walletName + ".dat";
+        std::string walletPath = walletFile;
+        if (!table->GetDataDir().empty()) {
+            walletPath = JoinWalletPath(table->GetDataDir(), walletFile);
+        }
+        
+        // Save wallet
+        if (!wallet->Save(walletPath)) {
+            return RPCResponse::Error(-4, "Failed to save restored wallet to: " + walletPath, req.GetId());
+        }
+        
+        // Set wallet in command table
+        table->SetWallet(std::move(wallet));
+        
+        JSONValue::Object result;
+        result["name"] = walletName;
+        result["path"] = walletPath;
+        result["warning"] = "Wallet restored successfully. "
+                           "Note: Imported keys from the original wallet (if any) are NOT recovered. "
+                           "You may need to rescan the blockchain to find existing transactions.";
+        
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+    } catch (const std::exception& e) {
+        return RPCResponse::Error(-4, std::string("Error restoring wallet: ") + e.what(), req.GetId());
     }
 }
 
