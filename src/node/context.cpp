@@ -48,26 +48,29 @@ static std::unique_ptr<consensus::Params> GetConsensusParams(const std::string& 
 
 static Block GetGenesisBlock(const std::string& network, Amount blockReward) {
     if (network == "testnet") {
+        // Genesis hash: 000001b2150a56cc228d9b60fedaace333bb67b4ef168ef1e01e29b6ce61ae75
         return CreateGenesisBlock(
             1700000001,    // Timestamp
-            723569,        // Nonce (mined)
+            2015211,       // Nonce (mined for 50 SHR reward)
             0x1e0fffff,    // Initial difficulty
             1,             // Version
             blockReward
         );
     } else if (network == "regtest") {
+        // Genesis hash: 277a4081985b8800293bf3cda91202c6b761a8b8de4f5fcc018d6cf14f60737c
         return CreateGenesisBlock(
             1700000002,    // Timestamp
-            0,             // Nonce (mined)
+            6,             // Nonce (mined for 50 SHR reward)
             0x207fffff,    // Very easy difficulty
             1,             // Version
             blockReward
         );
     } else {
         // Mainnet
+        // Genesis hash: 0000090f1d7ccd5f0b91be5a92cfa9e075c6af443594f33f7c2238c3626f3172
         return CreateGenesisBlock(
             1700000000,    // Timestamp
-            1574105,       // Nonce (mined)
+            586684,        // Nonce (mined for 50 SHR reward)
             0x1e0fffff,    // Initial difficulty
             1,             // Version
             blockReward
@@ -180,6 +183,11 @@ bool InitializeNode(NodeContext& node, const NodeInitOptions& options) {
     
     try {
         node.chainman = std::make_unique<ChainStateManager>(*node.params);
+        
+        // Set the block database for storing blocks
+        if (node.blockDB) {
+            node.chainman->SetBlockDB(node.blockDB.get());
+        }
         
         if (!node.chainman->Initialize(node.coinsDB.get())) {
             LOG_ERROR(util::LogCategory::DEFAULT) << "Failed to initialize chain state manager";

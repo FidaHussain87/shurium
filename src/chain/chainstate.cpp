@@ -5,6 +5,7 @@
 #include "shurium/chain/chainstate.h"
 #include "shurium/consensus/validation.h"
 #include "shurium/script/interpreter.h"
+#include "shurium/db/blockdb.h"
 #include "shurium/util/logging.h"
 #include <cassert>
 #include <algorithm>
@@ -483,6 +484,25 @@ bool ChainStateManager::ProcessNewBlock(const Block& block, bool fForceProcessin
         LOG_ERROR(util::LogCategory::DEFAULT) << "ProcessNewBlock: CheckBlock failed - " 
                                                << state.GetRejectReason() << ": " << state.GetDebugMessage();
         return false;
+    }
+    
+    // Store block to disk if we have a block database
+    if (m_blockdb) {
+        db::DiskBlockPos pos;
+        db::Status dbStatus = m_blockdb->WriteBlock(block, pos);
+        if (!dbStatus.ok()) {
+            LOG_ERROR(util::LogCategory::DEFAULT) << "ProcessNewBlock: Failed to store block - " 
+                                                   << dbStatus.ToString();
+            return false;
+        }
+        
+        // Update block index with storage location
+        pindex->nFile = pos.nFile;
+        pindex->nDataPos = pos.nPos;
+        pindex->nStatus = pindex->nStatus | BlockStatus::HAVE_DATA;
+        
+        LOG_DEBUG(util::LogCategory::DEFAULT) << "Block stored at file " << pos.nFile 
+                                               << " pos " << pos.nPos;
     }
     
     // Mark as having valid transactions

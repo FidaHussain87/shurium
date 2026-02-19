@@ -18,6 +18,9 @@
 
 namespace shurium {
 
+// Forward declarations
+namespace db { class BlockDB; }
+
 // ============================================================================
 // BlockUndo - Undo information for disconnecting a block
 // ============================================================================
@@ -315,6 +318,9 @@ private:
     /// Best known block (may be ahead of active tip during sync)
     BlockIndex* m_bestHeader{nullptr};
     
+    /// Block database for storing blocks (optional, not owned)
+    db::BlockDB* m_blockdb{nullptr};
+    
     /// Mutex for thread-safe access
     mutable std::mutex m_cs;
     
@@ -329,6 +335,12 @@ public:
     
     /// Initialize with backing UTXO storage
     bool Initialize(CoinsView* coinsDB);
+    
+    /// Set the block database for storing blocks
+    void SetBlockDB(db::BlockDB* blockdb) { m_blockdb = blockdb; }
+    
+    /// Get the block database
+    db::BlockDB* GetBlockDB() const { return m_blockdb; }
     
     // ========================================================================
     // Block Index

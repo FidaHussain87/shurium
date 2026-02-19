@@ -1204,11 +1204,23 @@ int AppMain(int argc, char* argv[]) {
             g_miner->SetMessageProcessor(g_node->msgproc.get());
         }
         
-        // Set callback for block found
+        // Set callback for block found - notify wallet about the new block
         g_miner->SetBlockFoundCallback([](const Block& block, bool accepted) {
             if (accepted) {
                 LOG_INFO(util::LogCategory::DEFAULT) << "Mined block " 
                     << block.GetHash().ToHex().substr(0, 16) << "... accepted!";
+                
+                // Notify wallet about the new block so it can track coinbase outputs
+                if (g_wallet) {
+                    int32_t height = g_node ? g_node->GetHeight() : 0;
+                    g_wallet->ProcessBlock(block, height);
+                    LOG_DEBUG(util::LogCategory::DEFAULT) << "Wallet notified of new block at height " << height;
+                }
+                
+                // Remove confirmed transactions from mempool
+                if (g_node && g_node->mempool) {
+                    g_node->mempool->RemoveForBlock(block.vtx);
+                }
             } else {
                 LOG_WARN(util::LogCategory::DEFAULT) << "Mined block " 
                     << block.GetHash().ToHex().substr(0, 16) << "... rejected";
