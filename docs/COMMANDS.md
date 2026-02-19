@@ -874,7 +874,180 @@ Unloads the current wallet.
 
 ---
 
+### restorewallet
+
+Restores a wallet from a 24-word mnemonic recovery phrase.
+
+```bash
+./shurium-cli restorewallet "WALLET_NAME" "MNEMONIC" [passphrase]
+```
+
+| Param | Description |
+|-------|-------------|
+| wallet_name | Name for the restored wallet |
+| mnemonic | 24-word recovery phrase (space-separated) |
+| passphrase | Optional BIP39 passphrase (if one was used during creation) |
+
+**Example:**
+```bash
+# Unload current wallet first
+./shurium-cli unloadwallet
+
+# Restore from mnemonic
+./shurium-cli restorewallet "restored_wallet" "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
+```
+
+**With BIP39 passphrase:**
+```bash
+./shurium-cli restorewallet "restored_wallet" "word1 word2 ... word24" "my_bip39_passphrase"
+```
+
+**Returns:**
+```json
+{
+  "name": "restored_wallet",
+  "path": "/home/user/.shurium/restored_wallet.dat",
+  "warning": "Wallet restored successfully. Note: Imported keys from the original wallet (if any) are NOT recovered. You may need to rescan the blockchain to find existing transactions."
+}
+```
+
+**Error (wrong word count):**
+```json
+{
+  "error": "Invalid mnemonic: expected 24 words, got 12"
+}
+```
+
+⚠️ **Important Notes:**
+- The mnemonic must be exactly **24 words** separated by spaces
+- If you used a BIP39 passphrase when creating the wallet, you **must** provide it
+- Imported private keys (via `importprivkey`) are NOT restored - only HD-derived keys
+- You may need to rescan the blockchain to see existing transactions
+
+---
+
 ## ⛏️ Mining Commands
+
+SHURIUM supports CPU mining to earn SHR coins. There are multiple ways to configure and control mining.
+
+### Mining Setup Methods
+
+#### Method 1: Runtime Control with setgenerate (Recommended)
+
+Control mining without restarting the daemon.
+
+**Prerequisites:** Start daemon with `--miningaddress` OR have a wallet loaded.
+
+```bash
+# Start daemon with mining address (mining not started yet)
+./shuriumd --daemon --miningaddress=shr1qyouraddress...
+
+# Enable mining at runtime
+./shurium-cli setgenerate true
+
+# Disable mining
+./shurium-cli setgenerate false
+```
+
+#### Method 2: Daemon Startup Arguments
+
+Start daemon with mining enabled immediately.
+
+```bash
+# Start with mining enabled
+./shuriumd --daemon --gen=1 --genthreads=2 --miningaddress=shr1qyouraddress...
+```
+
+| Argument | Description |
+|----------|-------------|
+| `--gen=1` | Enable mining (1=on, 0=off) |
+| `--genthreads=N` | Number of mining threads |
+| `--miningaddress=ADDR` | Address to receive rewards |
+
+#### Method 3: Configuration File (shurium.conf)
+
+Add to `~/.shurium/shurium.conf`:
+
+```ini
+# Mining Configuration
+gen=1
+genthreads=2
+miningaddress=shr1qyouraddress...
+```
+
+#### Method 4: Hybrid Approach (Best Practice)
+
+Set address in config, control mining via RPC:
+
+**~/.shurium/shurium.conf:**
+```ini
+gen=0
+miningaddress=shr1qyouraddress...
+```
+
+**Then control mining:**
+```bash
+./shurium-cli setgenerate true   # Start when ready
+./shurium-cli setgenerate false  # Stop when done
+```
+
+---
+
+### setgenerate
+
+Enable or disable mining at runtime.
+
+```bash
+./shurium-cli setgenerate GENERATE [genproclimit]
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| GENERATE | boolean | Yes | `true` to enable, `false` to disable |
+| genproclimit | number | No | Number of threads (-1 for all cores) |
+
+**Examples:**
+```bash
+# Enable mining
+./shurium-cli setgenerate true
+
+# Enable mining with 4 threads
+./shurium-cli setgenerate true 4
+
+# Disable mining
+./shurium-cli setgenerate false
+```
+
+**Returns:**
+```json
+// Enable success:
+{
+  "mining": true,
+  "message": "Mining enabled"
+}
+
+// Already enabled:
+{
+  "mining": true,
+  "message": "Mining is already enabled",
+  "hashrate": 5910.50
+}
+
+// Disable success:
+{
+  "mining": false,
+  "message": "Mining disabled",
+  "blocks_found": 1234
+}
+
+// Error (no mining address):
+{
+  "error": "Mining not available. The daemon was started without mining support. Please restart with --miningaddress=<your_address>"
+}
+```
+
+---
 
 ### getmininginfo
 
@@ -888,52 +1061,24 @@ Returns mining state information.
 ```json
 {
   "blocks": 123456,
-  "difficulty": 12345.67,
-  "networkhashps": 98765432,
-  "generate": true,
-  "genthreads": 4,
-  "hashespersec": 12345
+  "chain": "main",
+  "difficulty": 0.00024414,
+  "networkhashps": 5910.50,
+  "pooledtx": 5,
+  "pouw_enabled": true,
+  "active_problems": 0,
+  "solved_problems": 0
 }
 ```
 
----
-
-### setgenerate
-
-Enables/disables mining.
-
-```bash
-./shurium-cli setgenerate GENERATE [threads]
-```
-
-**Examples:**
-```bash
-# Start mining with 4 threads
-./shurium-cli setgenerate true 4
-
-# Stop mining
-./shurium-cli setgenerate false
-```
-
----
-
-### getblocktemplate
-
-Gets block template for mining.
-
-```bash
-./shurium-cli getblocktemplate [template_request]
-```
-
----
-
-### submitblock
-
-Submits a mined block.
-
-```bash
-./shurium-cli submitblock "HEXDATA"
-```
+| Field | Description |
+|-------|-------------|
+| blocks | Current block height |
+| chain | Network (main, test, regtest) |
+| difficulty | Current mining difficulty |
+| networkhashps | Network hash rate |
+| pooledtx | Transactions in mempool |
+| pouw_enabled | Proof of Useful Work status |
 
 ---
 
@@ -975,8 +1120,27 @@ ADDR=$(./shurium-cli --regtest getnewaddress)
 
 **Notes:**
 - Coinbase rewards need 100 confirmations before they're spendable
-- Each block rewards 40 SHR to the miner (40% of 100 SHR block reward)
 - This command is only available in regtest mode for testing
+
+---
+
+### getblocktemplate
+
+Gets block template for external mining software.
+
+```bash
+./shurium-cli getblocktemplate [template_request]
+```
+
+---
+
+### submitblock
+
+Submits a mined block to the network.
+
+```bash
+./shurium-cli submitblock "HEXDATA"
+```
 
 ---
 
@@ -1013,6 +1177,44 @@ Lists PoUW problems.
 | pending | Waiting for solution |
 | solved | Completed |
 | expired | Timed out |
+
+---
+
+### Mining Rewards and Maturity
+
+- **Block Reward:** Mining rewards are paid in the coinbase transaction
+- **Maturity:** Mined coins need **100 confirmations** before they're spendable
+- **Check Immature Balance:**
+  ```bash
+  ./shurium-cli getwalletinfo | grep -E "balance|immature"
+  ```
+
+---
+
+### Complete Mining Example
+
+```bash
+# 1. Get your mining address
+MINING_ADDR=$(./shurium-cli getnewaddress "mining")
+echo "Mining address: $MINING_ADDR"
+
+# 2. Add to config for persistence
+echo "miningaddress=$MINING_ADDR" >> ~/.shurium/shurium.conf
+
+# 3. Restart daemon (or start fresh)
+./shurium-cli stop
+sleep 3
+./shuriumd --daemon
+
+# 4. Enable mining
+./shurium-cli setgenerate true
+
+# 5. Monitor mining
+watch -n 10 './shurium-cli getmininginfo; echo ""; ./shurium-cli getwalletinfo | grep balance'
+
+# 6. Stop mining when done
+./shurium-cli setgenerate false
+```
 
 ---
 

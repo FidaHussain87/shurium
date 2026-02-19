@@ -144,36 +144,89 @@ Look for:
 
 ### Enable Mining
 
-#### Option 1: Configuration File (Recommended)
+There are several ways to enable mining in SHURIUM:
 
-Edit `~/.shurium/shurium.conf`:
+#### Method 1: Runtime Control with setgenerate (Recommended)
+
+Control mining without restarting the daemon. Best for flexibility.
+
+**Prerequisites:** Start daemon with `--miningaddress=<your_address>` OR have a wallet loaded.
+
+```bash
+# Start daemon with mining address (but mining NOT started yet)
+./shuriumd --daemon --miningaddress=shr1qyouraddress...
+
+# Later, enable mining at runtime
+./shurium-cli setgenerate true
+
+# Enable mining with specific thread count
+./shurium-cli setgenerate true 4
+
+# Check mining status
+./shurium-cli getmininginfo
+
+# Stop mining when you want
+./shurium-cli setgenerate false
+```
+
+**Response examples:**
+```json
+// Enable success:
+{"mining": true, "message": "Mining enabled"}
+
+// Already enabled:
+{"mining": true, "message": "Mining is already enabled", "hashrate": 5910.50}
+
+// Disable success:
+{"mining": false, "message": "Mining disabled", "blocks_found": 1234}
+```
+
+#### Method 2: Configuration File (Persistent)
+
+Add to `~/.shurium/shurium.conf` for mining to start automatically:
 
 ```bash
 # Mining settings
-gen=1                  # Enable mining (0=off, 1=on)
-genthreads=2           # Number of CPU cores to use
+gen=1                                    # Enable mining (0=off, 1=on)
+genthreads=2                             # Number of CPU cores to use
+miningaddress=shr1qyouraddress...        # Address to receive rewards
 ```
 
 Then restart SHURIUM:
 ```bash
 ./shurium-cli stop
-./shuriumd
+./shuriumd --daemon
 ```
 
-#### Option 2: Command Line
+#### Method 3: Command Line Arguments
+
+Start daemon with mining enabled immediately:
 
 ```bash
-./shuriumd --gen=1 --genthreads=2
+./shuriumd --daemon --gen=1 --genthreads=2 --miningaddress=shr1qyouraddress...
 ```
 
-#### Option 3: While Running (No Restart)
+| Argument | Description |
+|----------|-------------|
+| `--gen=1` | Enable mining (1=on, 0=off) |
+| `--genthreads=N` | Number of mining threads |
+| `--miningaddress=ADDR` | Address to receive rewards |
 
+#### Method 4: Hybrid Approach (Best Practice)
+
+Set mining address in config but control mining via RPC:
+
+**~/.shurium/shurium.conf:**
 ```bash
-# Start mining with 2 threads
-./shurium-cli setgenerate true 2
+# Don't auto-start mining, but set the address
+gen=0
+miningaddress=shr1qyouraddress...
+```
 
-# Stop mining
-./shurium-cli setgenerate false
+**Then control mining at will:**
+```bash
+./shurium-cli setgenerate true   # Start when ready
+./shurium-cli setgenerate false  # Stop when done
 ```
 
 ---

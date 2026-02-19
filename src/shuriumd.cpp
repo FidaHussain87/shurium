@@ -1148,87 +1148,93 @@ int AppMain(int argc, char* argv[]) {
             g_stakingEngine.get(), [](staking::StakingEngine*){}));
     }
     
-    // Start mining if enabled
-    if (g_config.mining) {
-        LOG_INFO(util::LogCategory::DEFAULT) << "Mining enabled with " 
-                                             << g_config.miningThreads << " threads";
-        
-        // Get mining address (from config or wallet)
-        Hash160 miningAddress;
-        if (!g_config.miningAddress.empty()) {
-            // Parse address from config using DecodeAddress
-            auto scriptPubKey = DecodeAddress(g_config.miningAddress);
+    // Initialize miner (create even if not starting, for setgenerate support)
+    // Get mining address (from config or wallet)
+    Hash160 miningAddress;
+    if (!g_config.miningAddress.empty()) {
+        // Parse address from config using DecodeAddress
+        auto scriptPubKey = DecodeAddress(g_config.miningAddress);
+        if (!scriptPubKey.empty() && scriptPubKey.size() >= 22) {
+            // Extract hash from P2PKH (OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG)
+            // or P2WPKH (OP_0 <20 bytes>)
+            if (scriptPubKey.size() == 25 && scriptPubKey[0] == 0x76) {
+                // P2PKH: skip OP_DUP(0x76) OP_HASH160(0xa9) 0x14(length)
+                std::memcpy(miningAddress.data(), &scriptPubKey[3], 20);
+            } else if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00) {
+                // P2WPKH: skip OP_0(0x00) 0x14(length)
+                std::memcpy(miningAddress.data(), &scriptPubKey[2], 20);
+            }
+        }
+        if (miningAddress.IsNull()) {
+            LOG_ERROR(util::LogCategory::DEFAULT) << "Invalid mining address: " << g_config.miningAddress;
+        }
+    } else if (g_wallet) {
+        // Get address from wallet
+        auto addresses = g_wallet->GetAddresses();
+        if (!addresses.empty()) {
+            auto scriptPubKey = DecodeAddress(addresses[0]);
             if (!scriptPubKey.empty() && scriptPubKey.size() >= 22) {
-                // Extract hash from P2PKH (OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG)
-                // or P2WPKH (OP_0 <20 bytes>)
                 if (scriptPubKey.size() == 25 && scriptPubKey[0] == 0x76) {
-                    // P2PKH: skip OP_DUP(0x76) OP_HASH160(0xa9) 0x14(length)
                     std::memcpy(miningAddress.data(), &scriptPubKey[3], 20);
                 } else if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00) {
-                    // P2WPKH: skip OP_0(0x00) 0x14(length)
                     std::memcpy(miningAddress.data(), &scriptPubKey[2], 20);
                 }
             }
-            if (miningAddress.IsNull()) {
-                LOG_ERROR(util::LogCategory::DEFAULT) << "Invalid mining address: " << g_config.miningAddress;
-            }
-        } else if (g_wallet) {
-            // Get address from wallet
-            auto addresses = g_wallet->GetAddresses();
-            if (!addresses.empty()) {
-                auto scriptPubKey = DecodeAddress(addresses[0]);
-                if (!scriptPubKey.empty() && scriptPubKey.size() >= 22) {
-                    if (scriptPubKey.size() == 25 && scriptPubKey[0] == 0x76) {
-                        std::memcpy(miningAddress.data(), &scriptPubKey[3], 20);
-                    } else if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00) {
-                        std::memcpy(miningAddress.data(), &scriptPubKey[2], 20);
-                    }
-                }
-                if (!miningAddress.IsNull()) {
-                    LOG_INFO(util::LogCategory::DEFAULT) << "Using wallet address for mining: " << addresses[0];
-                }
+            if (!miningAddress.IsNull()) {
+                LOG_INFO(util::LogCategory::DEFAULT) << "Using wallet address for mining: " << addresses[0];
             }
         }
+    }
+    
+    // Create miner if we have a valid address (can be started later via setgenerate)
+    if (!miningAddress.IsNull()) {
+        miner::MinerOptions minerOpts;
+        minerOpts.numThreads = g_config.miningThreads;
+        minerOpts.coinbaseAddress = miningAddress;
         
-        if (miningAddress.IsNull()) {
-            LOG_WARN(util::LogCategory::DEFAULT) << "No mining address available. Mining disabled.";
-            LOG_WARN(util::LogCategory::DEFAULT) << "Use --miningaddress=<addr> or create a wallet first.";
-        } else {
-            // Create and start miner
-            miner::MinerOptions minerOpts;
-            minerOpts.numThreads = g_config.miningThreads;
-            minerOpts.coinbaseAddress = miningAddress;
-            
-            g_miner = std::make_unique<miner::Miner>(
-                *g_node->chainman,
-                *g_node->mempool,
-                *g_node->params,
-                minerOpts
-            );
-            
-            // Set message processor for block relay
-            if (g_node->msgproc) {
-                g_miner->SetMessageProcessor(g_node->msgproc.get());
+        g_miner = std::make_unique<miner::Miner>(
+            *g_node->chainman,
+            *g_node->mempool,
+            *g_node->params,
+            minerOpts
+        );
+        
+        // Set message processor for block relay
+        if (g_node->msgproc) {
+            g_miner->SetMessageProcessor(g_node->msgproc.get());
+        }
+        
+        // Set callback for block found
+        g_miner->SetBlockFoundCallback([](const Block& block, bool accepted) {
+            if (accepted) {
+                LOG_INFO(util::LogCategory::DEFAULT) << "Mined block " 
+                    << block.GetHash().ToHex().substr(0, 16) << "... accepted!";
+            } else {
+                LOG_WARN(util::LogCategory::DEFAULT) << "Mined block " 
+                    << block.GetHash().ToHex().substr(0, 16) << "... rejected";
             }
-            
-            // Set callback for block found
-            g_miner->SetBlockFoundCallback([](const Block& block, bool accepted) {
-                if (accepted) {
-                    LOG_INFO(util::LogCategory::DEFAULT) << "Mined block " 
-                        << block.GetHash().ToHex().substr(0, 16) << "... accepted!";
-                } else {
-                    LOG_WARN(util::LogCategory::DEFAULT) << "Mined block " 
-                        << block.GetHash().ToHex().substr(0, 16) << "... rejected";
-                }
-            });
-            
+        });
+        
+        // Set miner in RPC command table for setgenerate command
+        if (g_rpcCommands) {
+            g_rpcCommands->SetMiner(g_miner.get());
+        }
+        
+        // Start mining if enabled via config
+        if (g_config.mining) {
+            LOG_INFO(util::LogCategory::DEFAULT) << "Mining enabled with " 
+                                                 << g_config.miningThreads << " threads";
             if (g_miner->Start()) {
                 LOG_INFO(util::LogCategory::DEFAULT) << "Miner started successfully";
             } else {
                 LOG_ERROR(util::LogCategory::DEFAULT) << "Failed to start miner";
-                g_miner.reset();
             }
+        } else {
+            LOG_INFO(util::LogCategory::DEFAULT) << "Miner initialized but not started. Use 'setgenerate true' to start mining.";
         }
+    } else {
+        LOG_WARN(util::LogCategory::DEFAULT) << "No mining address available. Mining disabled.";
+        LOG_WARN(util::LogCategory::DEFAULT) << "Use --miningaddress=<addr> or create a wallet first.";
     }
     
     // Start staking if enabled

@@ -35,6 +35,7 @@ namespace shurium {
     namespace staking { class StakingEngine; }
     namespace governance { class GovernanceEngine; }
     namespace network { class NetworkManager; }
+    namespace miner { class Miner; }
 }
 
 namespace shurium {
@@ -105,6 +106,9 @@ public:
     /// Set data directory path (for wallet file paths)
     void SetDataDir(const std::string& dataDir);
     
+    /// Set miner reference (for mining control)
+    void SetMiner(miner::Miner* miner);
+    
     // === Command Registration ===
     
     /// Register all commands with the server
@@ -130,6 +134,7 @@ public:
     MessageProcessor* GetMessageProcessor() const { return msgproc_; }
     db::BlockDB* GetBlockDB() const { return blockdb_.get(); }
     const std::string& GetDataDir() const { return dataDir_; }
+    miner::Miner* GetMiner() const { return miner_; }
 
 private:
     // === Command Registration Helpers ===
@@ -158,6 +163,7 @@ private:
     std::shared_ptr<db::BlockDB> blockdb_;
     MessageProcessor* msgproc_{nullptr};  // Not owned - raw pointer for optional ref
     std::string dataDir_;  // Data directory for wallet file paths
+    miner::Miner* miner_{nullptr};  // Not owned - raw pointer for mining control
 };
 
 // ============================================================================
@@ -511,6 +517,10 @@ RPCResponse cmd_getproblem(const RPCRequest& req, const RPCContext& ctx,
 /// Generate blocks to address (regtest only)
 RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
                                   RPCCommandTable* table);
+
+/// Enable or disable mining (setgenerate)
+RPCResponse cmd_setgenerate(const RPCRequest& req, const RPCContext& ctx,
+                            RPCCommandTable* table);
 
 // ============================================================================
 // Utility Commands

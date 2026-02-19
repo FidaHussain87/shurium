@@ -334,6 +334,10 @@ void RPCCommandTable::SetDataDir(const std::string& dataDir) {
     dataDir_ = dataDir;
 }
 
+void RPCCommandTable::SetMiner(miner::Miner* miner) {
+    miner_ = miner;
+}
+
 void RPCCommandTable::RegisterCommands(RPCServer& server) {
     // Register all command categories
     RegisterBlockchainCommands();
@@ -1397,6 +1401,21 @@ void RPCCommandTable::RegisterMiningCommands() {
         true, false,
         {"nblocks", "address"},
         {"How many blocks to generate", "Address to send rewards to"}
+    });
+    
+    commands_.push_back({
+        "setgenerate",
+        Category::MINING,
+        "Enable or disable mining.\n"
+        "Arguments:\n"
+        "1. generate  (boolean, required) Set to true to turn on mining, false to turn off\n"
+        "2. genproclimit  (numeric, optional) Set the number of threads for mining (-1 = all cores)",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_setgenerate(req, ctx, table);
+        },
+        true, false,
+        {"generate", "genproclimit"},
+        {"Enable/disable mining", "Number of mining threads (-1 for all cores)"}
     });
 }
 
@@ -6459,6 +6478,84 @@ RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
         }
         
         return RPCResponse::Success(JSONValue(std::move(blockHashes)), req.GetId());
+        
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
+    }
+}
+
+/**
+ * Enable or disable mining at runtime.
+ * 
+ * @param generate true to enable mining, false to disable
+ * @param genproclimit number of threads (-1 for auto/all cores)
+ * @return Status of mining after the command
+ */
+RPCResponse cmd_setgenerate(const RPCRequest& req, const RPCContext& ctx,
+                            RPCCommandTable* table) {
+    try {
+        // Get parameters
+        bool generate = GetRequiredParam<bool>(req, size_t(0));
+        int64_t genproclimit = GetOptionalParam<int64_t>(req, size_t(1), int64_t(-1));
+        
+        // Get the miner
+        miner::Miner* miner = table->GetMiner();
+        
+        if (generate) {
+            // Enable mining
+            if (!miner) {
+                return RPCError(-1, 
+                    "Mining not available. The daemon was started without mining support.\n"
+                    "Please restart the daemon with --gen=1 --miningaddress=<your_address>\n"
+                    "or add 'gen=1' and 'miningaddress=<your_address>' to shurium.conf",
+                    req.GetId());
+            }
+            
+            if (miner->IsRunning()) {
+                // Already running
+                JSONValue::Object result;
+                result["mining"] = true;
+                result["message"] = "Mining is already enabled";
+                result["hashrate"] = miner->GetHashRate();
+                return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+            }
+            
+            // Start the miner
+            if (!miner->Start()) {
+                return RPCError(-1, "Failed to start mining", req.GetId());
+            }
+            
+            JSONValue::Object result;
+            result["mining"] = true;
+            result["message"] = "Mining enabled";
+            return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+            
+        } else {
+            // Disable mining
+            if (!miner) {
+                JSONValue::Object result;
+                result["mining"] = false;
+                result["message"] = "Mining is not available (daemon started without mining support)";
+                return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+            }
+            
+            if (!miner->IsRunning()) {
+                // Already stopped
+                JSONValue::Object result;
+                result["mining"] = false;
+                result["message"] = "Mining is already disabled";
+                return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+            }
+            
+            // Stop the miner
+            miner->Stop();
+            
+            JSONValue::Object result;
+            result["mining"] = false;
+            result["message"] = "Mining disabled";
+            result["blocks_found"] = static_cast<int64_t>(miner->GetStats().blocksFound.load());
+            return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        }
         
     } catch (const std::exception& e) {
         return InvalidParams(e.what(), req.GetId());
