@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build
+build/
+dist/
+*.tsbuildinfo
+
+# iOS
+ios/Pods/
+ios/build/
+*.xcworkspace
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/debug/
+android/app/release/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# Metro
+.metro-health-check*
+
+# Testing
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+*.log
+
+# Env
+.env
+.env.*
+
+# Bundle analysis
+*.hprof
+
+# Temporary
+*.swp
+*.swo
+*~
