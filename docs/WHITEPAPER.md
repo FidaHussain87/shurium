@@ -285,23 +285,22 @@ SHURIUM is built on five revolutionary innovations:
 │  │                                                                  │   │
 │  │   HOW UBI DISTRIBUTION WORKS                                     │   │
 │  │                                                                  │   │
-│  │   Daily new coins: ~288,000 SHR                                  │   │
+│  │   Daily new coins: ~144,000 SHR (2,880 blocks × 50 SHR)          │   │
 │  │                                                                  │   │
 │  │             ┌───────────────────────────┐                        │   │
 │  │             │    UBI POOL               │                        │   │
-│  │             │    30% = 86,400 SHR/day   │                        │   │
+│  │             │    30% = 43,200 SHR/day   │                        │   │
 │  │             └───────────────────────────┘                        │   │
 │  │                         │                                        │   │
 │  │                         │ Divided equally                        │   │
 │  │                         ▼                                        │   │
 │  │   ┌─────────────────────────────────────────────────────────┐    │   │
 │  │   │                                                         │    │   │
-│  │   │   👤      👤      👤      👤      👤      👤      👤    │   │    │
-│  │   │                                                         │    │   │
 │  │   │   Every verified human gets an EQUAL share              │    │   │
 │  │   │                                                         │    │   │
-│  │   │   If 100,000 people are verified:                       │    │   │
-│  │   │   Each person gets 0.864 SHR per day                    │    │   │
+│  │   │   If 10,000 users:    4.32 SHR/day/person               │    │   │
+│  │   │   If 100,000 users:   0.432 SHR/day/person              │    │   │
+│  │   │   If 1,000,000 users: 0.0432 SHR/day/person             │    │   │
 │  │   │                                                         │    │   │
 │  │   └─────────────────────────────────────────────────────────┘    │   │
 │  │                                                                  │   │
@@ -310,8 +309,15 @@ SHURIUM is built on five revolutionary innovations:
 │  THE RULES:                                                             │
 │  • One human = One share (no corporations, no whales)                   │
 │  • Must verify identity (with privacy protection!)                      │
-│  • Claim daily or it goes back to the pool                              │
+│  • Claim per epoch or it stays in the pool for other claimers           │
 │  • Cannot be sold, transferred, or stolen before claiming               │
+│                                                                         │
+│  TECHNICAL DETAILS:                                                     │
+│  • Distribution: Epoch-based (2,880 blocks = ~24 hours on mainnet)      │
+│  • Identity: Commitment-based with nullifier double-claim prevention    │
+│  • Privacy: Zero-knowledge proofs for anonymous claiming                │
+│  • Commands: createidentity, claimubi, getubiinfo                       │
+│  • See: UBI_SYSTEM.md for complete technical reference                  │
 │                                                                         │
 │  WHY IT MATTERS:                                                        │
 │  • Everyone benefits from the network's growth                          │

@@ -676,38 +676,135 @@ Sends to multiple addresses.
 
 ### sendfrom
 
-Sends coins from a specific address to another address. Unlike `sendtoaddress` which picks UTXOs from any address in the wallet, `sendfrom` only uses coins from the specified source address.
+Sends coins from a specific address to another address. Unlike `sendtoaddress` which picks UTXOs from any address in the wallet, `sendfrom` only uses coins from the specified source address. This is essential for fund management, accounting transparency, and address-level control.
 
 ```bash
 ./shurium-cli sendfrom "FROM_ADDRESS" "TO_ADDRESS" AMOUNT [comment]
 ```
 
 **Arguments:**
-| Argument | Type | Description |
-|----------|------|-------------|
-| from_address | string | The source address (must be in your wallet) |
-| to_address | string | The destination address |
-| amount | numeric | The amount to send (in SHR) |
-| comment | string | Optional comment for the transaction |
 
-**Example:**
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| from_address | string | Yes | Source address (must be in your wallet with spendable UTXOs) |
+| to_address | string | Yes | Destination address (any valid SHURIUM address) |
+| amount | numeric | Yes | Amount to send in SHR (e.g., 50 or 50.5) |
+| comment | string | No | Optional comment stored in wallet (not on blockchain) |
+
+**Returns:**
+```json
+"txid_hex_string"   // Transaction ID on success
+```
+
+**Examples:**
+
 ```bash
-# Transfer 50 SHR from mining address to savings address
-./shurium-cli sendfrom "shr1qmining..." "shr1qsavings..." 50 "Monthly savings"
+# Basic transfer between addresses
+./shurium-cli sendfrom "shr1qsource123..." "shr1qdest456..." 100
 
-# Transfer from UBI fund to recipient
+# Transfer with comment
+./shurium-cli sendfrom "shr1qmining..." "shr1qsavings..." 50 "Monthly savings transfer"
+
+# Transfer from fund address
 ./shurium-cli sendfrom "shr1qubifund..." "shr1qrecipient..." 100 "UBI distribution"
+
+# Regtest example with port
+./shurium-cli --regtest --rpcport=18443 sendfrom "shr1qabc..." "shr1qdef..." 25
 ```
 
 **Use Cases:**
-- **Fund Management**: Spend from specific fund addresses (UBI, Contribution, etc.)
-- **Accounting**: Track spending per address for organizational transparency
-- **Segregated Wallets**: Keep funds organized by purpose
 
-**Notes:**
-- Returns change to the source address (not a random wallet address)
-- Fails if the source address has insufficient funds
-- Transaction fee is deducted from the source address balance
+| Use Case | Description |
+|----------|-------------|
+| **Fund Management** | Spend from specific fund addresses (UBI, Contribution, Ecosystem, Stability) while keeping other funds untouched |
+| **Organizational Accounting** | Track spending per address for transparency and audit trails |
+| **Segregated Wallets** | Keep funds organized by purpose (operations, savings, payroll, etc.) |
+| **Change Control** | Ensure change returns to the source address, maintaining fund isolation |
+| **Government/Institutional Use** | Distribute funds from designated treasury addresses with clear provenance |
+
+**How It Works:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SENDFROM UTXO SELECTION                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   Wallet UTXOs:                                                         │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
+│   │ Address A   │  │ Address A   │  │ Address B   │  │ Address C   │    │
+│   │ 50 SHR      │  │ 30 SHR      │  │ 100 SHR     │  │ 25 SHR      │    │
+│   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │
+│                                                                         │
+│   sendfrom "Address A" "Address X" 60 SHR                               │
+│                                                                         │
+│   ✓ Uses: Address A UTXOs ONLY (50 + 30 = 80 SHR available)             │
+│   ✗ Ignores: Address B, Address C UTXOs                                 │
+│                                                                         │
+│   Result:                                                               │
+│   ├── Output 1: Address X receives 60 SHR                               │
+│   ├── Output 2: Address A receives ~19.99 SHR (change)                  │
+│   └── Fee: ~0.01 SHR deducted                                           │
+│                                                                         │
+│   Key Difference from sendtoaddress:                                    │
+│   sendtoaddress would pick ANY UTXOs, potentially mixing addresses      │
+│   sendfrom GUARANTEES source address isolation                          │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Transaction Details:**
+
+| Aspect | Behavior |
+|--------|----------|
+| **Input Selection** | Greedy selection from source address UTXOs only (largest first) |
+| **Change Address** | Always returns to the FROM address (not a new wallet address) |
+| **Fee Estimation** | ~1000 satoshis base + ~150 satoshis per input |
+| **Dust Threshold** | Change outputs < 546 satoshis are dropped (added to fee) |
+| **RBF** | Enabled (nSequence = 0xFFFFFFFE) for fee bumping if needed |
+| **Version** | Transaction version 2 |
+
+**Error Handling:**
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Wallet is locked` | Wallet encryption active | Run `walletpassphrase "pass" timeout` first |
+| `Invalid from address` | Malformed address string | Check address format (shr1q... or tshr1q...) |
+| `Invalid to address` | Malformed destination | Verify destination address |
+| `Amount must be positive` | Zero or negative amount | Specify positive amount |
+| `No funds available at the specified from address` | Source address has no UTXOs | Verify address has received funds and they're confirmed |
+| `Insufficient funds at from address` | Not enough balance | Check available balance; may need to consolidate |
+| `Insufficient funds after accounting for fee` | Balance covers amount but not fee | Send slightly less or add funds |
+
+**Verification Workflow:**
+
+```bash
+# 1. Check source address balance first
+./shurium-cli listunspent 1 9999999 '["shr1qsource..."]'
+
+# 2. Execute transfer
+TXID=$(./shurium-cli sendfrom "shr1qsource..." "shr1qdest..." 100)
+
+# 3. Verify transaction
+./shurium-cli gettransaction "$TXID"
+
+# 4. Confirm change returned to source
+./shurium-cli listunspent 0 9999999 '["shr1qsource..."]'
+```
+
+**Comparison with Other Send Commands:**
+
+| Command | Source Selection | Change Address | Use Case |
+|---------|------------------|----------------|----------|
+| `sendtoaddress` | Any wallet UTXO | New wallet address | General payments |
+| `sendfrom` | Specific address only | Source address | Fund management, accounting |
+| `sendmany` | Any wallet UTXO | New wallet address | Batch payments |
+
+**Security Considerations:**
+
+- Wallet must be unlocked to sign transaction
+- Comment is stored locally only (not broadcast)
+- Transaction is broadcast to network immediately on success
+- Verify recipient address carefully before sending
 
 ---
 
