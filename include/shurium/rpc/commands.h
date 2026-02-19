@@ -589,6 +589,12 @@ RPCResponse cmd_listfundtransactions(const RPCRequest& req, const RPCContext& ct
 RPCResponse cmd_getfundaddress(const RPCRequest& req, const RPCContext& ctx,
                                RPCCommandTable* table);
 
+/// Set a custom address for a fund (for organizations/governments)
+/// Params: fundtype, address
+/// Returns: success status and warning about persistence
+RPCResponse cmd_setfundaddress(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table);
+
 // ============================================================================
 // Helper Functions
 // ============================================================================

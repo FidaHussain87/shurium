@@ -168,6 +168,10 @@
 │   FUND SECURITY: All 60% non-miner rewards secured by 2-of-3 multisig   │
 │   Compare to Bitcoin: 100% to miners, nothing for ecosystem/users.      │
 │                                                                         │
+│   VERIFY FUND BALANCES (full transparency):                             │
+│   ./shurium-cli getfundinfo           # View all fund details           │
+│   ./shurium-cli getfundbalance ubi    # Check any fund balance          │
+│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 

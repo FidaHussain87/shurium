@@ -560,6 +560,7 @@ SHURIUM is built on five revolutionary innovations:
 │   • 3 key holders for each fund (Governance, Foundation, Community)     │
 │   • Any 2 of 3 must sign to spend                                       │
 │   • No single party can steal or misuse funds                           │
+│   • Addresses are deterministic and verifiable by anyone                │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  FUND              │  GOVERNANCE VOTE   │  SPEND LIMIT          │   │
@@ -577,10 +578,43 @@ SHURIUM is built on five revolutionary innovations:
 │   🏢 FOUNDATION  → SHURIUM foundation representative                    │
 │   👥 COMMUNITY   → Community-elected guardian                           │
 │                                                                         │
-│   View fund addresses: ./shurium-cli getfundinfo                        │
-│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Viewing Fund Information
+
+Anyone can verify fund balances and addresses using the SHURIUM CLI:
+
+```bash
+# View all funds with addresses and governance rules
+./shurium-cli getfundinfo
+
+# Check balance of any fund
+./shurium-cli getfundbalance ubi          # UBI Pool
+./shurium-cli getfundbalance contribution # Contribution Fund
+./shurium-cli getfundbalance ecosystem    # Ecosystem Fund
+./shurium-cli getfundbalance stability    # Stability Reserve
+
+# Get fund address with multisig public keys
+./shurium-cli getfundaddress ubi
+
+# List transactions to a fund
+./shurium-cli listfundtransactions ubi 10
+```
+
+**Example: Checking UBI Pool Balance**
+```json
+{
+  "fund": "UBI Pool",
+  "address": "shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb",
+  "balance": 15375.00,
+  "total_received": 15375.00,
+  "chain_height": 1050,
+  "note": "Balance calculated from block rewards."
+}
+```
+
+This transparency ensures community oversight of all protocol funds.
 
 ### Supply Schedule
 

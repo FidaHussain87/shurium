@@ -429,6 +429,12 @@ Every block reward is automatically split among 5 recipients:
 
 ### Fund Security
 
+> **WARNING: Configure Your Own Fund Addresses Before Production Use!**
+>
+> By default, SHURIUM uses **demo addresses** generated from public seeds. **Nobody controls the private keys** for these addresses - any funds sent to them are **permanently lost**.
+>
+> Before mining in production, configure your own addresses using `setfundaddress` or `shurium.conf`.
+
 The 60% allocated to protocol funds is secured by **2-of-3 multisig** addresses:
 
 | Fund | % | Governance Required | Purpose |
@@ -440,7 +446,42 @@ The 60% allocated to protocol funds is secured by **2-of-3 multisig** addresses:
 
 Each fund is controlled by 3 key holders (Governance, Foundation, Community) - any 2 must sign to spend.
 
-View fund details: `./shurium-cli getfundinfo`
+### View Fund Information
+
+```bash
+# View all fund details (addresses, governance rules, multisig info)
+./shurium-cli getfundinfo
+
+# Check balance for a specific fund
+./shurium-cli getfundbalance ubi
+./shurium-cli getfundbalance contribution
+./shurium-cli getfundbalance ecosystem
+./shurium-cli getfundbalance stability
+
+# Set your own fund address (IMPORTANT for production!)
+./shurium-cli setfundaddress ubi shr1qyouraddress...
+
+# Get fund address with multisig public keys
+./shurium-cli getfundaddress ubi
+
+# List fund transactions
+./shurium-cli listfundtransactions ubi 10
+```
+
+**Example output from `getfundbalance ubi` (with default demo address):**
+```json
+{
+  "WARNING": "Using DEFAULT DEMO ADDRESS. NOBODY controls the private keys!",
+  "fund": "UBI Pool",
+  "address": "shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb",
+  "address_source": "default (demo)",
+  "is_custom_address": false,
+  "balance": 0.00,
+  "note": "Configure your own address before mining!"
+}
+```
+
+View detailed fund documentation: [Fund Management Commands](docs/COMMANDS.md#-fund-management-commands)
 
 ---
 

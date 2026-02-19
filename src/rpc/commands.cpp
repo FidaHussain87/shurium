@@ -1586,6 +1586,18 @@ void RPCCommandTable::RegisterUtilityCommands() {
         {"fundtype"},
         {"Fund type (optional, if omitted shows all)"}
     });
+    
+    commands_.push_back({
+        "setfundaddress",
+        Category::BLOCKCHAIN,
+        "Set a custom address for a fund (for organizations/governments).",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_setfundaddress(req, ctx, table);
+        },
+        false, false,
+        {"fundtype", "address"},
+        {"Fund type (ubi, contribution, ecosystem, stability)", "Address to receive fund rewards"}
+    });
 }
 
 
@@ -6994,12 +7006,8 @@ RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
     // Import fund manager
     using namespace economics;
     
-    // Initialize fund manager if not already done
-    static bool initialized = false;
-    if (!initialized) {
-        InitializeFundManager("regtest");  // TODO: Get network from context
-        initialized = true;
-    }
+    // Ensure fund manager is initialized (no-op if already done by daemon)
+    InitializeFundManager("regtest");  // TODO: Get network from context
     
     JSONValue::Array funds;
     
@@ -7010,6 +7018,8 @@ RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
         fund["description"] = config.description;
         fund["percentage"] = config.percentageBasisPoints / 100.0;
         fund["address"] = config.GetAddress("shr");
+        fund["address_source"] = FundAddressSourceToString(config.addressSource);
+        fund["is_custom_address"] = config.HasCustomAddress();
         fund["requires_governance_vote"] = config.requiresGovernanceVote;
         fund["max_spend_without_vote"] = static_cast<double>(config.maxSpendWithoutVote) / COIN;
         
@@ -7017,16 +7027,18 @@ RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
         fund["multisig_required"] = static_cast<int64_t>(FUND_MULTISIG_REQUIRED);
         fund["multisig_total"] = static_cast<int64_t>(FUND_MULTISIG_TOTAL);
         
-        // Add key info
-        JSONValue::Array keys;
-        for (const auto& keyInfo : config.keys) {
-            JSONValue::Object key;
-            key["pubkey"] = keyInfo.pubkey.ToHex();
-            key["description"] = keyInfo.description;
-            key["role"] = static_cast<int64_t>(keyInfo.role);
-            keys.push_back(key);
+        // Add key info (only if using default multisig)
+        if (!config.HasCustomAddress()) {
+            JSONValue::Array keys;
+            for (const auto& keyInfo : config.keys) {
+                JSONValue::Object key;
+                key["pubkey"] = keyInfo.pubkey.ToHex();
+                key["description"] = keyInfo.description;
+                key["role"] = static_cast<int64_t>(keyInfo.role);
+                keys.push_back(key);
+            }
+            fund["keys"] = keys;
         }
-        fund["keys"] = keys;
         
         funds.push_back(fund);
     }
@@ -7036,6 +7048,20 @@ RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
     result["funds"] = funds;
     result["total_fund_percentage"] = GetFundManager().GetTotalFundPercentage();
     result["miner_percentage"] = 40;  // Miner gets 40%
+    
+    // Check if any funds are using default addresses
+    bool hasDefaultAddresses = false;
+    for (const auto& config : allFunds) {
+        if (!config.HasCustomAddress()) {
+            hasDefaultAddresses = true;
+            break;
+        }
+    }
+    
+    if (hasDefaultAddresses) {
+        result["WARNING"] = "One or more funds are using DEFAULT DEMO ADDRESSES. These are generated from public seeds - NOBODY controls the private keys! Any funds sent to default addresses are UNSPENDABLE. Use 'setfundaddress' or shurium.conf to configure real addresses before mining.";
+    }
+    result["note"] = "Use 'setfundaddress <fundtype> <address>' or configure addresses in shurium.conf for production.";
     
     return RPCResponse::Success(result, req.GetId());
 }
@@ -7064,24 +7090,75 @@ RPCResponse cmd_getfundbalance(const RPCRequest& req, const RPCContext& ctx,
         return InvalidParams("Invalid fund type. Use: ubi, contribution, ecosystem, stability", req.GetId());
     }
     
-    // Initialize fund manager if needed
-    static bool initialized = false;
-    if (!initialized) {
-        InitializeFundManager("regtest");
-        initialized = true;
-    }
+    // Ensure fund manager is initialized (no-op if already done by daemon)
+    InitializeFundManager("regtest");
     
     const auto& config = GetFundManager().GetFundConfig(type);
+    
+    // Calculate balance from blockchain height
+    // This is an estimate based on block rewards - actual UTXO scanning not yet implemented
+    Amount calculatedBalance = 0;
+    Amount totalReceived = 0;
+    int height = -1;
+    
+    ChainStateManager* chainman = table ? table->GetChainStateManager() : nullptr;
+    if (chainman) {
+        height = chainman->GetActiveHeight();
+        
+        // Calculate total rewards received by this fund
+        int halvingInterval = 1000;  // Regtest halving interval
+        Amount initialReward = 50 * COIN;
+        int remainingBlocks = height;
+        int halving = 0;
+        
+        // Get fund percentage
+        int fundPct = 0;
+        switch (type) {
+            case FundType::UBI: fundPct = 30; break;
+            case FundType::Contribution: fundPct = 15; break;
+            case FundType::Ecosystem: fundPct = 10; break;
+            case FundType::Stability: fundPct = 5; break;
+        }
+        
+        while (remainingBlocks > 0) {
+            Amount reward = initialReward >> halving;  // Divide by 2^halving
+            if (reward == 0) break;
+            
+            int blocksInPeriod = std::min(halvingInterval, remainingBlocks);
+            Amount fundReward = (reward * fundPct) / 100;
+            totalReceived += blocksInPeriod * fundReward;
+            
+            remainingBlocks -= blocksInPeriod;
+            halving++;
+        }
+        
+        // For now, assume no spending (balance = total received)
+        calculatedBalance = totalReceived;
+    }
     
     JSONValue::Object result;
     result["fund"] = config.name;
     result["address"] = config.GetAddress("shr");
-    result["balance"] = static_cast<double>(GetFundManager().GetFundBalance(type)) / COIN;
-    result["total_received"] = static_cast<double>(GetFundManager().GetTotalReceived(type)) / COIN;
-    result["total_spent"] = static_cast<double>(GetFundManager().GetTotalSpent(type)) / COIN;
+    result["address_source"] = FundAddressSourceToString(config.addressSource);
+    result["is_custom_address"] = config.HasCustomAddress();
+    result["balance"] = static_cast<double>(calculatedBalance) / COIN;
+    result["total_received"] = static_cast<double>(totalReceived) / COIN;
+    result["total_spent"] = 0.0;  // No spending mechanism implemented yet
+    result["chain_height"] = height;
     
-    // Note: Full balance tracking requires UTXO database integration
-    result["note"] = "Balance tracking requires full node sync. Values shown may be estimates.";
+    // Add appropriate note based on state
+    if (!chainman) {
+        result["note"] = "Chain state manager not available. Ensure full node sync.";
+    } else if (height < 0) {
+        result["note"] = "Chain not initialized yet.";
+    } else {
+        result["note"] = "Balance calculated from block rewards (no spending tracked yet).";
+    }
+    
+    // Add WARNING if using default demo address
+    if (!config.HasCustomAddress()) {
+        result["WARNING"] = "Using DEFAULT DEMO ADDRESS. These addresses are generated from public seeds - NOBODY controls the private keys! Any funds sent here are UNSPENDABLE. For production, use 'setfundaddress' or configure addresses in shurium.conf.";
+    }
     
     return RPCResponse::Success(result, req.GetId());
 }
@@ -7112,12 +7189,8 @@ RPCResponse cmd_listfundtransactions(const RPCRequest& req, const RPCContext& ct
         return InvalidParams("Invalid fund type. Use: ubi, contribution, ecosystem, stability", req.GetId());
     }
     
-    // Initialize fund manager if needed
-    static bool initialized = false;
-    if (!initialized) {
-        InitializeFundManager("regtest");
-        initialized = true;
-    }
+    // Ensure fund manager is initialized (no-op if already done by daemon)
+    InitializeFundManager("regtest");
     
     const auto& config = GetFundManager().GetFundConfig(type);
     
@@ -7141,12 +7214,8 @@ RPCResponse cmd_getfundaddress(const RPCRequest& req, const RPCContext& ctx,
     
     using namespace economics;
     
-    // Initialize fund manager if needed
-    static bool initialized = false;
-    if (!initialized) {
-        InitializeFundManager("regtest");
-        initialized = true;
-    }
+    // Ensure fund manager is initialized (no-op if already done by daemon)
+    InitializeFundManager("regtest");
     
     // Optional fund type filter
     std::string fundTypeStr = GetOptionalParam<std::string>(req, size_t(0), std::string(""));
@@ -7196,6 +7265,58 @@ RPCResponse cmd_getfundaddress(const RPCRequest& req, const RPCContext& ctx,
     }
     
     return RPCResponse::Success(addresses, req.GetId());
+}
+
+RPCResponse cmd_setfundaddress(const RPCRequest& req, const RPCContext& ctx,
+                               RPCCommandTable* table) {
+    (void)ctx;
+    (void)table;
+    
+    using namespace economics;
+    
+    // Get parameters
+    std::string fundTypeStr = GetRequiredParam<std::string>(req, size_t(0));
+    std::string address = GetRequiredParam<std::string>(req, size_t(1));
+    
+    // Parse fund type
+    FundType type;
+    if (fundTypeStr == "ubi" || fundTypeStr == "UBI") {
+        type = FundType::UBI;
+    } else if (fundTypeStr == "contribution" || fundTypeStr == "contributions") {
+        type = FundType::Contribution;
+    } else if (fundTypeStr == "ecosystem" || fundTypeStr == "eco") {
+        type = FundType::Ecosystem;
+    } else if (fundTypeStr == "stability" || fundTypeStr == "reserve") {
+        type = FundType::Stability;
+    } else {
+        return InvalidParams("Invalid fund type. Use: ubi, contribution, ecosystem, stability", req.GetId());
+    }
+    
+    // Validate address format (basic check)
+    if (address.length() < 10 || address.find("1q") == std::string::npos) {
+        return InvalidParams("Invalid address format. Expected bech32 format (e.g., shr1q...)", req.GetId());
+    }
+    
+    // Ensure fund manager is initialized (no-op if already done by daemon)
+    InitializeFundManager("regtest");
+    
+    // Try to set the address
+    if (!GetFundManager().SetFundAddress(type, address, FundAddressSource::RpcCommand)) {
+        return InvalidParams("Failed to set fund address. Address may be invalid or fund address is locked by governance.", req.GetId());
+    }
+    
+    // Get updated config
+    const auto& config = GetFundManager().GetFundConfig(type);
+    
+    JSONValue::Object result;
+    result["success"] = true;
+    result["fund"] = config.name;
+    result["new_address"] = config.GetAddress("shr");
+    result["address_source"] = FundAddressSourceToString(config.addressSource);
+    result["warning"] = "This change is temporary (RPC command). For persistent changes, add to shurium.conf: " + 
+                        std::string(fundTypeStr) + "address=" + address;
+    
+    return RPCResponse::Success(result, req.GetId());
 }
 
 } // namespace rpc

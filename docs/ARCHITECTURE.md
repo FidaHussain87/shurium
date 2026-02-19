@@ -1091,16 +1091,37 @@ Think of SHURIUM like a **well-organized company** with different departments, e
 
 The economics module includes a **Fund Manager** that handles the 60% of block rewards going to protocol funds:
 
-| Fund | % | Security | Purpose |
-|------|---|----------|---------|
-| UBI Pool | 30% | 2-of-3 multisig | Universal Basic Income |
-| Contribution | 15% | 2-of-3 multisig | Human contribution rewards |
-| Ecosystem | 10% | 2-of-3 multisig | Development & growth |
-| Stability | 5% | 2-of-3 multisig | Price stability reserve |
+| Fund | % | Security | Governance Required | Purpose |
+|------|---|----------|---------------------|---------|
+| UBI Pool | 30% | 2-of-3 multisig | Yes (always) | Universal Basic Income |
+| Contribution | 15% | 2-of-3 multisig | No (up to 1,000 SHR) | Human contribution rewards |
+| Ecosystem | 10% | 2-of-3 multisig | No (up to 5,000 SHR) | Development & growth |
+| Stability | 5% | 2-of-3 multisig | Yes (always) | Price stability reserve |
+
+**Key Components:**
+- **FundManager**: Generates deterministic multisig addresses, tracks fund configurations
+- **FundConfig**: Stores fund parameters (name, percentage, governance rules)
+- **P2SH Addresses**: Pay-to-Script-Hash multisig addresses receiving block rewards
 
 Key files: `include/shurium/economics/funds.h`, `src/economics/funds.cpp`
 
-RPC commands: `getfundinfo`, `getfundbalance`, `getfundaddress`, `listfundtransactions`
+**RPC Commands for Fund Management:**
+```bash
+./shurium-cli getfundinfo              # All fund details
+./shurium-cli getfundbalance ubi       # Check fund balance
+./shurium-cli getfundaddress ubi       # Get address with pubkeys
+./shurium-cli listfundtransactions ubi # List fund transactions
+```
+
+**Block Reward Flow:**
+```
+Block Mined → Coinbase Transaction (5 outputs)
+├── Output 0: Miner (40%) → P2PKH to mining address
+├── Output 1: UBI (30%) → P2SH multisig
+├── Output 2: Contribution (15%) → P2SH multisig
+├── Output 3: Ecosystem (10%) → P2SH multisig
+└── Output 4: Stability (5%) → P2SH multisig
+```
 
 ---
 

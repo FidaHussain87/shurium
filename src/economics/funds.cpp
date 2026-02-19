@@ -20,6 +20,7 @@ namespace economics {
 // ============================================================================
 
 static std::unique_ptr<FundManager> g_fundManager;
+static bool g_fundManagerInitialized = false;
 
 FundManager& GetFundManager() {
     if (!g_fundManager) {
@@ -29,8 +30,18 @@ FundManager& GetFundManager() {
 }
 
 bool InitializeFundManager(const std::string& network) {
+    // Only initialize once - don't replace existing fund manager
+    if (g_fundManagerInitialized && g_fundManager) {
+        return true;  // Already initialized
+    }
+    
     g_fundManager = std::make_unique<FundManager>();
-    return g_fundManager->Initialize(network);
+    g_fundManagerInitialized = g_fundManager->Initialize(network);
+    return g_fundManagerInitialized;
+}
+
+bool IsFundManagerInitialized() {
+    return g_fundManagerInitialized && g_fundManager != nullptr;
 }
 
 // ============================================================================
@@ -75,8 +86,12 @@ Hash160 FundConfig::GetScriptHash() const {
 }
 
 std::string FundConfig::GetAddress(const std::string& hrp) const {
-    // For now, return hex representation with prefix
-    // TODO: Implement proper bech32 encoding for P2WSH
+    // If custom address is set, return it
+    if (!customAddress.empty()) {
+        return customAddress;
+    }
+    
+    // Otherwise, generate from multisig script hash
     Hash160 hash = GetScriptHash();
     std::ostringstream oss;
     oss << hrp << "1q";  // Simulated bech32 prefix
@@ -109,6 +124,7 @@ bool FundManager::Initialize(const std::string& network) {
         FundConfig config;
         config.type = type;
         config.percentageBasisPoints = GetFundPercentageBasisPoints(type);
+        config.addressSource = FundAddressSource::Default;  // Default until configured
         
         switch (type) {
             case FundType::UBI:
@@ -163,8 +179,8 @@ std::array<FundKeyInfo, FUND_MULTISIG_TOTAL> FundManager::GenerateInitialKeys(
     std::array<FundKeyInfo, FUND_MULTISIG_TOTAL> keys;
     
     // Generate deterministic keys based on fund type and network
-    // In production, these would be real keys held by different parties
-    // For now, we generate deterministic keys from seed phrases
+    // WARNING: These are demo/testing keys only!
+    // In production, use SetFundAddress() with real addresses you control.
     
     const char* fundNames[] = {"UBI", "CONTRIBUTION", "ECOSYSTEM", "STABILITY"};
     const char* roleNames[] = {"GOVERNANCE", "FOUNDATION", "COMMUNITY"};
@@ -233,6 +249,169 @@ int FundManager::GetTotalFundPercentage() const {
     }
     return total / 100;  // Convert basis points to percentage
 }
+
+// ============================================================================
+// Address Configuration
+// ============================================================================
+
+std::optional<Hash160> FundManager::ParseAddress(const std::string& address) {
+    // For addresses in the format "shr1q" + hex (like our default multisig)
+    // Try to parse as hex first
+    
+    size_t hexStart = address.find("1q");
+    if (hexStart == std::string::npos) {
+        return std::nullopt;
+    }
+    hexStart += 2;  // Skip "1q"
+    
+    std::string hexPart = address.substr(hexStart);
+    
+    // Check if this is a hex-encoded address (40 chars = 20 bytes)
+    if (hexPart.length() == 40) {
+        // Validate all chars are hex
+        bool isHex = true;
+        for (char c : hexPart) {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                isHex = false;
+                break;
+            }
+        }
+        
+        if (isHex) {
+            Hash160 hash;
+            for (size_t i = 0; i < 20; ++i) {
+                std::string byteStr = hexPart.substr(i * 2, 2);
+                try {
+                    hash[i] = static_cast<uint8_t>(std::stoul(byteStr, nullptr, 16));
+                } catch (...) {
+                    return std::nullopt;
+                }
+            }
+            return hash;
+        }
+    }
+    
+    // For bech32 addresses, we can't parse to Hash160 directly
+    // but we can still validate format and return a placeholder
+    // The actual address string will be stored in customAddress field
+    
+    // Basic bech32 format validation: must contain valid characters
+    // Bech32 uses: 0-9, a-z except 1, b, i, o (case-insensitive)
+    // For now, just return empty hash - the string address will be used directly
+    
+    // Return a deterministic hash based on the address string for mapping purposes
+    Hash256 addrHash = SHA256Hash(
+        reinterpret_cast<const uint8_t*>(address.data()),
+        address.size()
+    );
+    
+    Hash160 hash;
+    std::copy(addrHash.begin(), addrHash.begin() + 20, hash.begin());
+    return hash;
+}
+
+bool FundManager::SetFundAddress(FundType type, const std::string& address, FundAddressSource source) {
+    // Don't allow overriding genesis or governance addresses with lower-priority sources
+    for (auto& config : m_funds) {
+        if (config.type == type) {
+            // Check priority - higher priority sources cannot be overridden by lower ones
+            if (config.addressSource == FundAddressSource::GenesisBlock && 
+                source != FundAddressSource::Governance) {
+                return false;  // Only governance can override genesis
+            }
+            if (config.addressSource == FundAddressSource::Governance &&
+                source != FundAddressSource::Governance) {
+                return false;  // Only governance can override governance
+            }
+            
+            // Parse and validate the address
+            auto parsedHash = ParseAddress(address);
+            if (!parsedHash) {
+                return false;  // Invalid address format
+            }
+            
+            // Remove old address mapping
+            if (!config.customAddress.empty()) {
+                auto oldHash = ParseAddress(config.customAddress);
+                if (oldHash) {
+                    m_addressToFund.erase(*oldHash);
+                }
+            } else {
+                m_addressToFund.erase(config.scriptHash);
+            }
+            
+            // Set custom address
+            config.customAddress = address;
+            config.addressSource = source;
+            
+            // Add new address mapping
+            m_addressToFund[*parsedHash] = type;
+            
+            return true;
+        }
+    }
+    return false;
+}
+
+void FundManager::ClearCustomAddress(FundType type) {
+    for (auto& config : m_funds) {
+        if (config.type == type) {
+            if (!config.customAddress.empty()) {
+                // Remove custom address mapping
+                auto oldHash = ParseAddress(config.customAddress);
+                if (oldHash) {
+                    m_addressToFund.erase(*oldHash);
+                }
+                
+                config.customAddress.clear();
+                config.addressSource = FundAddressSource::Default;
+                
+                // Restore default address mapping
+                m_addressToFund[config.scriptHash] = type;
+            }
+            break;
+        }
+    }
+}
+
+bool FundManager::LoadAddressesFromConfig(const std::map<std::string, std::string>& config) {
+    // Map config keys to fund types
+    std::map<std::string, FundType> keyToType = {
+        {"ubiaddress", FundType::UBI},
+        {"ubi_address", FundType::UBI},
+        {"contributionaddress", FundType::Contribution},
+        {"contribution_address", FundType::Contribution},
+        {"ecosystemaddress", FundType::Ecosystem},
+        {"ecosystem_address", FundType::Ecosystem},
+        {"stabilityaddress", FundType::Stability},
+        {"stability_address", FundType::Stability}
+    };
+    
+    bool anySet = false;
+    
+    for (const auto& [key, value] : config) {
+        // Convert key to lowercase for comparison
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        
+        auto it = keyToType.find(lowerKey);
+        if (it != keyToType.end() && !value.empty()) {
+            if (SetFundAddress(it->second, value, FundAddressSource::ConfigFile)) {
+                anySet = true;
+            }
+        }
+    }
+    
+    return anySet;
+}
+
+FundAddressSource FundManager::GetAddressSource(FundType type) const {
+    return GetFundConfig(type).addressSource;
+}
+
+// ============================================================================
+// Key Management
+// ============================================================================
 
 bool FundManager::RotateKey(FundType type, size_t keyIndex, const FundKeyInfo& newKey) {
     if (keyIndex >= FUND_MULTISIG_TOTAL) {

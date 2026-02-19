@@ -9,6 +9,14 @@
 // - Stability Reserve (5%) - Price stability mechanism
 //
 // Each fund uses a 2-of-3 multisig for security and governance.
+//
+// CONFIGURATION:
+// Fund addresses can be configured in multiple ways (in order of priority):
+// 1. Genesis block (immutable after chain starts)
+// 2. Governance vote (requires supermajority)
+// 3. Configuration file (shurium.conf)
+// 4. RPC command (runtime, non-persistent)
+// 5. Default (deterministic addresses for demo/testing)
 
 #ifndef SHURIUM_ECONOMICS_FUNDS_H
 #define SHURIUM_ECONOMICS_FUNDS_H
@@ -64,6 +72,30 @@ inline int GetFundPercentageBasisPoints(FundType type) {
 }
 
 // ============================================================================
+// Address Source - Where the fund address came from
+// ============================================================================
+
+/// Source of fund address configuration
+enum class FundAddressSource {
+    Default,        // Deterministic address (demo/testing only)
+    ConfigFile,     // From shurium.conf
+    RpcCommand,     // Set via setfundaddress RPC
+    GenesisBlock,   // Defined in genesis block (immutable)
+    Governance      // Changed via governance vote
+};
+
+inline const char* FundAddressSourceToString(FundAddressSource source) {
+    switch (source) {
+        case FundAddressSource::Default: return "default (demo)";
+        case FundAddressSource::ConfigFile: return "configuration file";
+        case FundAddressSource::RpcCommand: return "RPC command";
+        case FundAddressSource::GenesisBlock: return "genesis block";
+        case FundAddressSource::Governance: return "governance vote";
+        default: return "unknown";
+    }
+}
+
+// ============================================================================
 // Fund Key Configuration
 // ============================================================================
 
@@ -105,6 +137,10 @@ struct FundConfig {
     Hash160 scriptHash;         // P2SH address hash
     Script redeemScript;        // Multisig redeem script
     
+    // Custom address (if set via config/RPC)
+    std::string customAddress;  // User-configured address (overrides multisig)
+    FundAddressSource addressSource;  // Where the address came from
+    
     // Governance
     bool requiresGovernanceVote;  // Whether spending requires on-chain vote
     Amount maxSpendWithoutVote;   // Max amount spendable without governance vote
@@ -117,6 +153,9 @@ struct FundConfig {
     
     /// Get the bech32 address for this fund
     std::string GetAddress(const std::string& hrp = "shr") const;
+    
+    /// Check if using custom address (not default multisig)
+    bool HasCustomAddress() const { return !customAddress.empty(); }
 };
 
 // ============================================================================
@@ -149,6 +188,24 @@ public:
     
     /// Get total percentage allocated to funds (should be 60%)
     int GetTotalFundPercentage() const;
+    
+    // ========================================================================
+    // Address Configuration
+    // ========================================================================
+    
+    /// Set a custom address for a fund (from config file or RPC)
+    /// Returns true if address was valid and set successfully
+    bool SetFundAddress(FundType type, const std::string& address, FundAddressSource source);
+    
+    /// Clear custom address, revert to default multisig
+    void ClearCustomAddress(FundType type);
+    
+    /// Load fund addresses from configuration file
+    /// Expects keys like: ubiaddress=shr1q..., ecosystemaddress=shr1q...
+    bool LoadAddressesFromConfig(const std::map<std::string, std::string>& config);
+    
+    /// Get the address source for a fund
+    FundAddressSource GetAddressSource(FundType type) const;
     
     // ========================================================================
     // Key Management
@@ -208,6 +265,9 @@ private:
         FundType type,
         const std::string& network
     );
+    
+    /// Parse address string to Hash160
+    static std::optional<Hash160> ParseAddress(const std::string& address);
 };
 
 // ============================================================================
@@ -235,8 +295,11 @@ std::vector<FundStats> GetAllFundStats();
 /// Get the global fund manager instance
 FundManager& GetFundManager();
 
-/// Initialize the global fund manager
+/// Initialize the global fund manager (only initializes once, safe to call multiple times)
 bool InitializeFundManager(const std::string& network);
+
+/// Check if fund manager has been initialized
+bool IsFundManagerInitialized();
 
 } // namespace economics
 } // namespace shurium

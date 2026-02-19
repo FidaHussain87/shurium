@@ -1513,7 +1513,7 @@ Lists governance parameters.
 
 ## 💰 Fund Management Commands
 
-SHURIUM allocates 60% of every block reward to protocol funds that support the ecosystem. These funds are secured by 2-of-3 multisig addresses.
+SHURIUM allocates 60% of every block reward to protocol funds that support the ecosystem. These funds are secured by 2-of-3 multisig addresses and are automatically funded with every new block.
 
 ### Block Reward Distribution
 
@@ -1525,9 +1525,53 @@ SHURIUM allocates 60% of every block reward to protocol funds that support the e
 | Ecosystem Fund | 10% | Development and ecosystem growth |
 | Stability Reserve | 5% | Price stability mechanism |
 
+### Understanding Fund Addresses
+
+> **CRITICAL WARNING: DEFAULT ADDRESSES ARE FOR DEMO ONLY**
+> 
+> When you first run SHURIUM, all fund addresses are **DEFAULT DEMO ADDRESSES**. These addresses are generated from public seed strings like `"SHURIUM_regtest_UBI_KEY_GOVERNANCE_V1"`.
+>
+> **NOBODY CONTROLS THE PRIVATE KEYS FOR DEFAULT ADDRESSES!**
+>
+> Any SHR sent to default addresses is **permanently lost/unspendable**. Before mining or using SHURIUM in production:
+> 1. Configure your own addresses using `setfundaddress` or `shurium.conf`
+> 2. Verify with `getfundinfo` that `address_source` shows `RPC command` or `configuration file`
+> 3. Never mine to default addresses in production
+
+Each fund has a **deterministic P2SH (Pay-to-Script-Hash) multisig address** that:
+- Is generated from seed strings unique to each network (mainnet/testnet/regtest)
+- Remains consistent across node restarts
+- Requires 2-of-3 signatures to spend
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      FUND SECURITY MODEL                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   Each fund address is controlled by 3 KEY HOLDERS:                 │
+│                                                                     │
+│   🏛️  GOVERNANCE KEY  ─┐                                            │
+│                        │                                            │
+│   🏢 FOUNDATION KEY   ─┼─► ANY 2 of 3 must sign to spend            │
+│                        │                                            │
+│   👥 COMMUNITY KEY    ─┘                                            │
+│                                                                     │
+│   This prevents:                                                    │
+│   • Single point of failure                                         │
+│   • Unilateral fund access                                          │
+│   • Theft by compromising one key                                   │
+│                                                                     │
+│   ⚠️  DEFAULT ADDRESSES: Keys are derived from PUBLIC seeds!        │
+│       Configure your own addresses before production use.           │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### getfundinfo
 
-Returns information about all protocol funds including addresses, governance rules, and multisig details.
+Returns comprehensive information about all protocol funds including addresses, governance rules, and multisig details.
 
 ```bash
 ./shurium-cli getfundinfo
@@ -1545,8 +1589,34 @@ Returns information about all protocol funds including addresses, governance rul
       "multisig_total": 3,
       "requires_governance_vote": true,
       "max_spend_without_vote": 0
+    },
+    {
+      "name": "Contribution Fund",
+      "percentage": 15,
+      "address": "shr1q2e62cce363b43714d1a34472a7e1f80d7194072c",
+      "multisig_required": 2,
+      "multisig_total": 3,
+      "requires_governance_vote": false,
+      "max_spend_without_vote": 1000
+    },
+    {
+      "name": "Ecosystem Fund",
+      "percentage": 10,
+      "address": "shr1q4354e7b2a4b8b9fbd98a8bffc620a52d2c31fdab",
+      "multisig_required": 2,
+      "multisig_total": 3,
+      "requires_governance_vote": false,
+      "max_spend_without_vote": 5000
+    },
+    {
+      "name": "Stability Reserve",
+      "percentage": 5,
+      "address": "shr1qd1d806d087f75504d925d502a3629941fc55af2f",
+      "multisig_required": 2,
+      "multisig_total": 3,
+      "requires_governance_vote": true,
+      "max_spend_without_vote": 0
     }
-    // ... other funds
   ],
   "total_fund_percentage": 60,
   "miner_percentage": 40
@@ -1557,54 +1627,95 @@ Returns information about all protocol funds including addresses, governance rul
 
 ### getfundbalance
 
-Returns the balance for a specific fund.
+Returns the balance for a specific fund, calculated from block rewards received.
 
 ```bash
-./shurium-cli getfundbalance "FUNDTYPE"
+./shurium-cli getfundbalance <fundtype>
 ```
 
-| Fund Type | Description |
-|-----------|-------------|
-| `ubi` | Universal Basic Income pool |
-| `contribution` | Human contribution rewards |
-| `ecosystem` | Development and ecosystem growth |
-| `stability` | Price stability reserve |
+**Parameters:**
 
-**Example:**
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `fundtype` | **Yes** | The fund to check (see valid values below) |
+
+**Valid Fund Types:**
+
+| Fund Type | Aliases | Description |
+|-----------|---------|-------------|
+| `ubi` | `UBI` | Universal Basic Income pool |
+| `contribution` | `contributions` | Human contribution rewards |
+| `ecosystem` | `eco` | Development and ecosystem growth |
+| `stability` | `reserve` | Price stability reserve |
+
+**Examples:**
 ```bash
+# Check UBI Pool balance
 ./shurium-cli getfundbalance ubi
+
+# Check Contribution Fund balance
+./shurium-cli getfundbalance contribution
+
+# Check Ecosystem Fund balance
+./shurium-cli getfundbalance ecosystem
+
+# Check Stability Reserve balance
+./shurium-cli getfundbalance stability
 ```
 
-**Output:**
+**Output (with default demo address - shows WARNING):**
 ```json
 {
+  "WARNING": "Using DEFAULT DEMO ADDRESS. These addresses are generated from public seeds - NOBODY controls the private keys! Any funds sent here are UNSPENDABLE. For production, use 'setfundaddress' or configure addresses in shurium.conf.",
   "fund": "UBI Pool",
   "address": "shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb",
-  "balance": 15000.00000000,
-  "total_received": 15000.00000000,
-  "total_spent": 0.00000000
+  "address_source": "default (demo)",
+  "is_custom_address": false,
+  "balance": 0.00000000,
+  "total_received": 0.00000000,
+  "total_spent": 0.00000000,
+  "chain_height": 0,
+  "note": "Balance calculated from block rewards (no spending tracked yet)."
 }
 ```
 
----
-
-### listfundtransactions
-
-Lists transactions for a specific fund.
-
-```bash
-./shurium-cli listfundtransactions "FUNDTYPE" [count] [skip]
+**Output (after setting custom address - no WARNING):**
+```json
+{
+  "fund": "UBI Pool",
+  "address": "shr1qyourorganizationaddress12345...",
+  "address_source": "RPC command",
+  "is_custom_address": true,
+  "balance": 15375.00000000,
+  "total_received": 15375.00000000,
+  "total_spent": 0.00000000,
+  "chain_height": 1050,
+  "note": "Balance calculated from block rewards (no spending tracked yet)."
+}
 ```
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| fundtype | Fund type (ubi, contribution, ecosystem, stability) | Required |
-| count | Number of transactions to return | 10 |
-| skip | Number of transactions to skip | 0 |
-
-**Example:**
+**Common Error:**
 ```bash
-./shurium-cli listfundtransactions ecosystem 20 0
+# ERROR: Missing required parameter
+./shurium-cli getfundbalance
+# Returns: error code: -32603, Missing required parameter at index 0
+
+# CORRECT: Specify fund type
+./shurium-cli getfundbalance ubi
+```
+
+**How Balance is Calculated:**
+
+The balance is calculated based on:
+1. Current blockchain height
+2. Block reward at each halving period
+3. Fund percentage allocation
+
+```
+Example at height 1050 (regtest with 1000 block halving):
+├── Blocks 1-1000:    1000 × 50 SHR × 30% = 15,000 SHR
+├── Blocks 1001-1050:   50 × 25 SHR × 30% =    375 SHR (after halving)
+└── Total UBI Balance: 15,375 SHR
 ```
 
 ---
@@ -1619,9 +1730,14 @@ Returns fund addresses with full multisig details including public keys and rede
 
 If `fundtype` is omitted, returns all fund addresses.
 
-**Example:**
+**Example - Get specific fund:**
 ```bash
 ./shurium-cli getfundaddress ubi
+```
+
+**Example - Get all funds:**
+```bash
+./shurium-cli getfundaddress
 ```
 
 **Output:**
@@ -1642,30 +1758,299 @@ If `fundtype` is omitted, returns all fund addresses.
 ]
 ```
 
+**Understanding the Output:**
+
+| Field | Description |
+|-------|-------------|
+| `fund` | Human-readable fund name |
+| `address` | P2SH multisig address receiving block rewards |
+| `multisig` | Signature requirement (e.g., "2-of-3") |
+| `pubkeys` | Array of 3 public keys controlling the fund |
+| `redeem_script` | The raw redeem script (for advanced users) |
+
 ---
 
-### Fund Governance
+### listfundtransactions
 
-Each fund has different governance requirements:
+Lists transactions for a specific fund (incoming block rewards).
 
-| Fund | Governance Vote Required | Max Spend Without Vote |
-|------|--------------------------|------------------------|
-| UBI Pool | Yes (always) | 0 SHR |
-| Contribution Fund | No | 1,000 SHR |
-| Ecosystem Fund | No | 5,000 SHR |
-| Stability Reserve | Yes (always) | 0 SHR |
+```bash
+./shurium-cli listfundtransactions "FUNDTYPE" [count] [skip]
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| fundtype | Fund type (ubi, contribution, ecosystem, stability) | Required |
+| count | Number of transactions to return | 10 |
+| skip | Number of transactions to skip | 0 |
+
+**Example:**
+```bash
+./shurium-cli listfundtransactions ecosystem 20 0
+```
+
+**Output:**
+```json
+{
+  "fund": "Ecosystem Fund",
+  "address": "shr1q4354e7b2a4b8b9fbd98a8bffc620a52d2c31fdab",
+  "transactions": [
+    {
+      "txid": "abc123...",
+      "block_height": 1050,
+      "amount": 2.50000000,
+      "type": "block_reward"
+    }
+  ],
+  "total_count": 1050,
+  "note": "Full transaction listing requires UTXO scanning (not yet implemented)."
+}
+```
+
+---
+
+### Viewing All Fund Balances
+
+To get a quick overview of all fund balances:
+
+```bash
+# View all fund balances at once
+echo "=== SHURIUM Fund Balances ===" && \
+./shurium-cli getfundbalance ubi && \
+./shurium-cli getfundbalance contribution && \
+./shurium-cli getfundbalance ecosystem && \
+./shurium-cli getfundbalance stability
+```
+
+Or create a simple script:
+
+```bash
+#!/bin/bash
+# fund-status.sh - Display all fund balances
+
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║              SHURIUM PROTOCOL FUND STATUS                  ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+for fund in ubi contribution ecosystem stability; do
+    ./shurium-cli getfundbalance $fund 2>/dev/null | \
+    grep -E '"fund"|"balance"|"address"' | \
+    sed 's/[",]//g' | sed 's/^/  /'
+    echo "---"
+done
+```
+
+---
+
+### Fund Governance Rules
+
+Each fund has different governance requirements for spending:
+
+| Fund | Governance Vote Required | Max Spend Without Vote | Typical Use |
+|------|--------------------------|------------------------|-------------|
+| **UBI Pool** | Yes (always) | 0 SHR | UBI distribution to verified humans |
+| **Contribution Fund** | No | 1,000 SHR | Bounties, contributor rewards |
+| **Ecosystem Fund** | No | 5,000 SHR | Grants, partnerships, development |
+| **Stability Reserve** | Yes (always) | 0 SHR | Buy/sell SHR for price stability |
 
 ### Multisig Key Holders
 
 Each fund is controlled by a 2-of-3 multisig with three key holders:
 
-| Role | Description |
-|------|-------------|
-| Governance | Elected governance council member |
-| Foundation | SHURIUM foundation key |
-| Community | Community-elected guardian |
+| Role | Description | Selection Method |
+|------|-------------|------------------|
+| 🏛️ **Governance** | Elected governance council member | Community vote |
+| 🏢 **Foundation** | SHURIUM foundation key | Foundation board |
+| 👥 **Community** | Community-elected guardian | Community vote |
 
-Any 2 of these 3 key holders must sign to spend from a fund.
+**To spend from any fund, any 2 of these 3 key holders must sign the transaction.**
+
+---
+
+### Fund Address Prefixes by Network
+
+| Network | Address Prefix | Example |
+|---------|---------------|---------|
+| Mainnet | `shr1q...` | `shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb` |
+| Testnet | `tshr1q...` | `tshr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb` |
+| Regtest | `shr1q...` | `shr1q902acb56b202b7f43cf605da3ad7aa1e5abbb9fb` |
+
+---
+
+### Verifying Fund Addresses
+
+You can verify that a coinbase transaction includes the correct fund outputs:
+
+```bash
+# Get the latest block
+BLOCKHASH=$(./shurium-cli getbestblockhash)
+
+# Get block details with transactions
+./shurium-cli getblock $BLOCKHASH 2
+
+# The coinbase transaction (first tx) should have 5 outputs:
+# Output 0: Miner reward (40%)
+# Output 1: UBI Pool (30%)
+# Output 2: Contribution Fund (15%)
+# Output 3: Ecosystem Fund (10%)
+# Output 4: Stability Reserve (5%)
+```
+
+---
+
+### setfundaddress
+
+**For Organizations/Governments:** Set a custom address for a fund to receive block rewards.
+
+```bash
+./shurium-cli setfundaddress <fundtype> <address>
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `fundtype` | **Yes** | Fund type (ubi, contribution, ecosystem, stability) |
+| `address` | **Yes** | Your organization's address to receive rewards |
+
+**Example:**
+```bash
+# Set custom UBI address for your organization
+./shurium-cli setfundaddress ubi shr1qyourorganizationaddress12345abcdef
+
+# Set custom ecosystem fund address
+./shurium-cli setfundaddress ecosystem shr1qecosystemfundaddress67890ghijkl
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "fund": "UBI Pool",
+  "new_address": "shr1qyourorganizationaddress12345abcdef",
+  "address_source": "RPC command",
+  "warning": "This change is temporary (RPC command). For persistent changes, add to shurium.conf: ubiaddress=shr1q..."
+}
+```
+
+**Important Notes:**
+- RPC changes persist **within the current daemon session** (across multiple RPC calls)
+- RPC changes are **lost on daemon restart** - use `shurium.conf` for permanent changes
+- Genesis block addresses **cannot** be overridden (except via governance)
+- You can set multiple fund addresses in a single session:
+  ```bash
+  ./shurium-cli setfundaddress ubi shr1q...
+  ./shurium-cli setfundaddress ecosystem shr1q...
+  ./shurium-cli getfundinfo  # Both changes are visible
+  ```
+
+---
+
+### Configuring Fund Addresses (For Organizations)
+
+SHURIUM supports multiple ways to configure fund recipient addresses. This is essential for governments, organizations, or private networks that want to control their own fund distribution.
+
+#### Address Source Priority (Highest to Lowest)
+
+| Priority | Source | Persistence | Use Case |
+|----------|--------|-------------|----------|
+| 1 | Genesis Block | Permanent (immutable) | Production mainnet |
+| 2 | Governance Vote | Until next vote | Democratic changes |
+| 3 | Configuration File | Until config change | Organizations, private networks |
+| 4 | RPC Command | Until daemon restart | Testing, temporary changes |
+| 5 | Default | Always available | Demo, development |
+
+#### Method 1: Configuration File (Recommended for Organizations)
+
+Add fund addresses to `~/.shurium/shurium.conf`:
+
+```ini
+# Fund recipient addresses
+# Replace with your organization's actual addresses
+
+# UBI Pool (30% of block rewards)
+ubiaddress=shr1qyour_ubi_address_here
+
+# Contribution Fund (15% of block rewards)
+contributionaddress=shr1qyour_contribution_address_here
+
+# Ecosystem Fund (10% of block rewards)
+ecosystemaddress=shr1qyour_ecosystem_address_here
+
+# Stability Reserve (5% of block rewards)
+stabilityaddress=shr1qyour_stability_address_here
+```
+
+Then restart the daemon:
+```bash
+./shurium-cli stop
+./shuriumd --daemon
+```
+
+#### Method 2: RPC Command (For Testing)
+
+Use RPC commands for quick testing. Changes persist within the daemon session but are lost on restart.
+
+```bash
+# Set addresses at runtime (persists until daemon restart)
+./shurium-cli setfundaddress ubi shr1q...
+./shurium-cli setfundaddress contribution shr1q...
+./shurium-cli setfundaddress ecosystem shr1q...
+./shurium-cli setfundaddress stability shr1q...
+
+# Verify changes - all 4 addresses will show "RPC command" as source
+./shurium-cli getfundinfo
+```
+
+#### Verifying Address Configuration
+
+```bash
+# Check address source for each fund
+./shurium-cli getfundinfo
+```
+
+Output includes `address_source` field:
+```json
+{
+  "funds": [
+    {
+      "name": "UBI Pool",
+      "address": "shr1qyour_ubi_address_here",
+      "address_source": "configuration file",
+      "is_custom_address": true
+    }
+  ]
+}
+```
+
+#### Example: Government UBI Distribution Setup
+
+A government wanting to distribute UBI would:
+
+1. **Create addresses** they control for each fund:
+   ```bash
+   # Generate addresses using your organization's wallet
+   ./shurium-cli getnewaddress "Government UBI Pool"
+   ./shurium-cli getnewaddress "Government Contribution Fund"
+   # etc.
+   ```
+
+2. **Configure in shurium.conf**:
+   ```ini
+   ubiaddress=shr1qgovernment_ubi_12345...
+   contributionaddress=shr1qgovernment_contrib_67890...
+   ecosystemaddress=shr1qgovernment_eco_abcdef...
+   stabilityaddress=shr1qgovernment_stability_ghijk...
+   ```
+
+3. **Start the daemon** - all block rewards will now flow to your addresses
+
+4. **Verify setup**:
+   ```bash
+   ./shurium-cli getfundinfo
+   # Check that address_source shows "configuration file"
+   ```
 
 ---
 
