@@ -1131,10 +1131,12 @@ Block Mined → Coinbase Transaction (5 outputs)
 
 | Document | Description |
 |----------|-------------|
+| [Deployment Guide](DEPLOYMENT_GUIDE.md) | Government & citizen setup |
 | [Whitepaper](WHITEPAPER.md) | The vision and design |
 | [For Investors](FOR_INVESTORS.md) | Investment thesis |
 | [For Miners](FOR_MINERS.md) | Mining guide |
 | [UBI Explained](UBI_EXPLAINED.md) | How UBI works |
 | [Comparison](COMPARISON.md) | SHURIUM vs Bitcoin |
+| [Commands Reference](COMMANDS.md) | All CLI commands |
 
 </div>

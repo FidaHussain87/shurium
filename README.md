@@ -11,6 +11,7 @@
 **Financial freedom for everyone • Democratic governance • Mining that helps humanity**
 
 [Quick Start](#-quick-start) •
+[Deployment Guide](docs/DEPLOYMENT_GUIDE.md) •
 [Documentation](docs/) •
 [FAQ](#-faq)
 
