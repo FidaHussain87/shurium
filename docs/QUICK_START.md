@@ -991,6 +991,7 @@ If you then run commands with `--testnet`, you're using a **different wallet**:
 2. ⛏️ Try [Mining](MINING_GUIDE.md) to earn coins
 3. 🥩 Set up [Staking](STAKING_GUIDE.md) for passive income
 4. 🎁 Register for [UBI](#ubi) to claim daily coins
+5. 🗳️ Participate in [Governance](COMMANDS.md#️-governance-commands) to vote on network decisions
 
 ---
 

@@ -639,6 +639,92 @@ This is **normal**! The unbonding period is a security feature.
 
 ---
 
+## 🗳️ Staking and Governance Voting
+
+Your staked SHR gives you **voting power** in SHURIUM's democratic governance system. The more you stake, the more influence you have on network decisions.
+
+### How Voting Power Works
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    VOTING POWER CALCULATION                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   Voting Power = sqrt(balance) × 1000                               │
+│                                                                     │
+│   This "square root" scaling prevents whales from dominating:       │
+│                                                                     │
+│   Balance        │ Voting Power │ Notes                             │
+│   ───────────────┼──────────────┼───────────────────────────────────│
+│   100 SHR        │ 10,000       │ Minimum to vote                   │
+│   1,000 SHR      │ 31,623       │ 10x more coins = 3x more power    │
+│   10,000 SHR     │ 100,000      │ 100x more coins = 10x more power  │
+│   1,000,000 SHR  │ 1,000,000    │ 10000x more coins = 100x power    │
+│                                                                     │
+│   This ensures small holders still have meaningful influence!       │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Voting Requirements
+
+| Requirement | Amount |
+|-------------|--------|
+| Minimum to vote | 100 SHR |
+| Minimum to create proposal | 10,000 SHR |
+
+### What Can You Vote On?
+
+| Proposal Type | Voting Period | Approval Needed | Example |
+|---------------|---------------|-----------------|---------|
+| **Parameter** | ~3 days | 50% | Change block size, fees |
+| **Protocol** | ~14 days | 66% | Add new features |
+| **Constitutional** | ~30 days | 75% | Change UBI rate |
+| **Signal** | ~3 days | 50% | Non-binding community polls |
+| **Emergency** | ~1 day | 66% | Critical security fixes |
+
+### Basic Governance Commands
+
+```bash
+# Check your voting power (based on balance)
+./shurium-cli getbalance
+
+# View current governance state
+./shurium-cli getgovernanceinfo
+
+# List active proposals
+./shurium-cli listproposals "active"
+
+# Vote on a proposal
+./shurium-cli vote "PROPOSAL_ID" yes "I support this change"
+
+# Create a proposal (requires 10,000+ SHR)
+./shurium-cli createproposal signal "My Proposal" "Description here" 10000
+```
+
+### Vote Delegation
+
+Don't have time to research every proposal? Delegate your voting power to a trusted expert:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    VOTE DELEGATION                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   YOU ──────────► TRUSTED DELEGATE ──────────► VOTES FOR YOU        │
+│                                                                     │
+│   • Keep your coins                                                 │
+│   • Delegate chooses on your behalf                                 │
+│   • Revoke anytime                                                  │
+│   • Different delegates for different topics                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+For complete governance documentation, see [COMMANDS.md](COMMANDS.md#️-governance-commands).
+
+---
+
 ## 📋 Quick Reference
 
 ### Delegation Commands
